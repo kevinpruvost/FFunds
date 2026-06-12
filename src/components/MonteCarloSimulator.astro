@@ -1,0 +1,1873 @@
+---
+---
+
+<section class="mc-card" data-monte-carlo>
+  <div class="mc-presets" role="group" aria-label="Profils prédéfinis">
+    <span class="mc-presets-label">Profil :</span>
+    <button type="button" class="mc-preset" data-preset="custom" data-cagr="7" data-drawdown="30">Personnalisé</button>
+    <button type="button" class="mc-preset" data-preset="golden" data-cagr="9" data-drawdown="29">Golden Ratio Portfolio</button>
+    <button type="button" class="mc-preset" data-preset="golden-2x" data-cagr="12.5" data-drawdown="40">2x Golden Ratio Portfolio</button>
+  </div>
+
+  <div class="mc-grid">
+    <label>
+      <span>Âge actuel</span>
+      <input data-input="currentAge" type="number" min="0" max="99" step="1" value="30" />
+    </label>
+    <label>
+      <span>Âge de départ à  la retraite</span>
+      <input data-input="retirementAge" type="number" min="1" max="99" step="1" value="60" />
+    </label>
+    <label>
+      <span>Âge d'arrêt des versements</span>
+      <input data-input="stopAge" type="number" min="1" max="99" step="1" value="60" />
+    </label>
+    <label>
+      <span>Investissement initial (EUR)</span>
+      <input data-input="initial" type="number" min="0" step="500" value="10000" />
+    </label>
+    <label>
+      <span>Versement mensuel (EUR)</span>
+      <input data-input="monthly" type="number" min="0" step="50" value="300" />
+    </label>
+    <label>
+      <span>CAGR annuel (%)</span>
+      <input data-input="cagr" type="number" step="0.1" value="7" />
+    </label>
+    <label>
+      <span>Inflation annuelle (%)</span>
+      <input data-input="inflation" type="number" step="0.1" value="2" />
+    </label>
+    <label>
+      <span>Drawdown max estimé (%) <em class="mc-max">max 95</em></span>
+      <input data-input="drawdown" type="number" min="0" max="95" step="1" value="30" />
+    </label>
+    <label>
+      <span>Objectif final visé (EUR, optionnel)</span>
+      <input data-input="target" type="number" min="0" step="1000" value="0" />
+    </label>
+    <label>
+      <span>Nombre de simulations <em class="mc-max" data-paths-display>1&nbsp;000</em></span>
+      <input data-input="paths" type="range" min="1000" max="50000" step="500" value="1000" />
+    </label>
+    <label class="mc-check">
+      <input data-input="forceDrawdown" data-input-type="checkbox" type="checkbox" />
+      <span>Forcer un drawdown max dans chaque simulation</span>
+    </label>
+  </div>
+
+  <div class="mc-actions">
+    <button type="button" data-run data-run-label="Relancer la simulation">Relancer la simulation</button>
+    <button type="button" data-optimize="initial" class="mc-opt-btn">Optimiser l'investissement initial</button>
+    <button type="button" data-optimize="monthly" class="mc-opt-btn">Optimiser les versements mensuels</button>
+    <span class="mc-hint">Glissez sur le graphique pour zoomer -· double-cliquez pour réinitialiser -· survolez pour les détails.</span>
+  </div>
+
+  <div class="mc-opt-result" data-opt-result hidden>
+    <strong data-opt-result-text></strong>
+    <span class="mc-opt-result-hint">Le scénario médian (p50) atteint l'objectif. Les paramètres ont été mis à  jour automatiquement.</span>
+  </div>
+
+  <div class="mc-zoom-info" data-zoom-info hidden>
+    <span data-zoom-info-text></span>
+    <button type="button" data-zoom-reset class="mc-zoom-reset">Réinitialiser le zoom</button>
+  </div>
+
+  <div class="mc-chart" data-chart>
+    <svg
+      data-svg
+      viewBox="0 0 900 420"
+      preserveAspectRatio="none"
+      role="img"
+      aria-label="Graphique interactif Monte Carlo"
+    >
+      <g data-grid></g>
+      <path data-band fill="rgba(45, 212, 191, 0.18)" stroke="none"></path>
+      <line data-target-line x1="0" y1="0" x2="0" y2="0" stroke="#facc15" stroke-width="1.5" stroke-dasharray="6 4" style="display:none"></line>
+      <text data-target-label x="0" y="0" fill="#facc15" font-size="12" text-anchor="end" style="display:none"></text>
+      <path data-p10 fill="none" stroke="rgba(96, 165, 250, 0.8)" stroke-width="1.5" stroke-dasharray="4 4"></path>
+      <path data-p90 fill="none" stroke="rgba(96, 165, 250, 0.8)" stroke-width="1.5" stroke-dasharray="4 4"></path>
+      <path data-p50 fill="none" stroke="#2dd4bf" stroke-width="2.5"></path>
+      <path data-p50-real fill="none" stroke="#f87171" stroke-width="2" stroke-dasharray="5 4"></path>
+      <g data-y-labels></g>
+      <g data-x-labels></g>
+      <line data-cursor x1="0" y1="0" x2="0" y2="0" stroke="rgba(226, 232, 240, 0.45)" stroke-width="1" stroke-dasharray="3 3" style="display:none"></line>
+      <circle data-dot-p50 r="4" fill="#2dd4bf" style="display:none"></circle>
+      <circle data-dot-p10 r="3" fill="#60a5fa" style="display:none"></circle>
+      <circle data-dot-p90 r="3" fill="#60a5fa" style="display:none"></circle>
+      <rect data-zoom-rect class="mc-zoom-rect" x="0" y="0" width="0" height="0" style="display:none"></rect>
+      <g data-hover-labels style="display:none">
+        <rect data-hover-bg x="0" y="0" width="0" height="0" rx="6" ry="6" fill="rgba(15, 23, 42, 0.95)" stroke="rgba(148, 163, 184, 0.35)" stroke-width="1"></rect>
+        <text data-hover-year x="0" y="0" fill="#f8fafc" font-size="13" font-weight="700"></text>
+        <text data-hover-p90 x="0" y="0" fill="#60a5fa" font-size="13"></text>
+        <text data-hover-p50 x="0" y="0" fill="#2dd4bf" font-size="13" font-weight="700"></text>
+        <text data-hover-p10 x="0" y="0" fill="#60a5fa" font-size="13"></text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="mc-legend">
+    <span><i style="background:#2dd4bf"></i>Scénario médian (nominal)</span>
+    <span><i style="background:#f87171"></i>Scénario médian (après inflation)</span>
+    <span><i style="background:rgba(45, 212, 191, 0.45)"></i>Plage pessimiste - optimiste</span>
+    <span><i style="background:#60a5fa"></i>Limites pessimiste / optimiste</span>
+    <span><i style="background:#facc15"></i>Objectif final</span>
+  </div>
+
+  <div class="mc-results" aria-live="polite">
+    <article>
+      <span>Total versé</span>
+      <strong data-result="invested">-</strong>
+      <em class="mc-real" data-result="invested-real">-</em>
+    </article>
+    <article>
+      <span>Scénario pessimiste</span>
+      <strong data-result="p10">-</strong>
+      <em class="mc-real" data-result="p10-real">-</em>
+    </article>
+    <article>
+      <span>Scénario médian</span>
+      <strong data-result="p50">-</strong>
+      <em class="mc-real" data-result="p50-real">-</em>
+    </article>
+    <article>
+      <span>Scénario optimiste</span>
+      <strong data-result="p90">-</strong>
+      <em class="mc-real" data-result="p90-real">-</em>
+    </article>
+    <article>
+      <span>Drawdown moyen simulé</span>
+      <strong data-result="avg-dd">-</strong>
+    </article>
+  </div>
+
+  <p class="mc-note">
+    Simulation pédagogique simplifiée. La volatilité mensuelle est calibrée pour que le drawdown moyen du marché simulé sur la durée choisie corresponde environ au « Drawdown max estimé » saisi. Un scénario individuel peut bien sûr connaître un drawdown plus faible ou bien plus élevé. Ce n'est pas une prévision financière.
+  </p>
+
+  <div class="mc-single">
+    <div class="mc-single-header">
+      <h3>Exemple d'une trajectoire aléatoire</h3>
+      <button type="button" data-single-run class="mc-single-run">Générer une nouvelle trajectoire</button>
+    </div>
+    <p class="mc-single-intro">
+      Une seule simulation tirée au hasard avec les mêmes paramètres. Cliquez sur le bouton pour voir à quel point le marché peut être erratique d'un scénario à  l'autre.
+    </p>
+    <div class="mc-zoom-info" data-single-zoom-info hidden>
+      <span data-single-zoom-info-text></span>
+      <button type="button" data-single-zoom-reset class="mc-zoom-reset">Réinitialiser le zoom</button>
+    </div>
+    <div class="mc-chart" data-single-chart>
+      <svg
+        data-single-svg
+        viewBox="0 0 900 360"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="Trajectoire aléatoire unique"
+      >
+        <g data-single-grid></g>
+        <path data-single-invested fill="none" stroke="rgba(148, 163, 184, 0.55)" stroke-width="1.5" stroke-dasharray="4 4"></path>
+        <path data-single-path fill="none" stroke="#f59e0b" stroke-width="2"></path>
+        <path data-single-real fill="none" stroke="#f87171" stroke-width="1.5" stroke-dasharray="5 4"></path>
+        <g data-single-y-labels></g>
+        <g data-single-x-labels></g>
+        <line data-single-cursor x1="0" y1="0" x2="0" y2="0" stroke="rgba(226, 232, 240, 0.45)" stroke-width="1" stroke-dasharray="3 3" style="display:none"></line>
+        <circle data-single-dot r="4" fill="#f59e0b" style="display:none"></circle>
+        <rect data-single-zoom-rect class="mc-zoom-rect" x="0" y="0" width="0" height="0" style="display:none"></rect>
+        <g data-single-hover-labels style="display:none">
+          <rect data-single-hover-bg x="0" y="0" width="0" height="0" rx="6" ry="6" fill="rgba(15, 23, 42, 0.95)" stroke="rgba(148, 163, 184, 0.35)" stroke-width="1"></rect>
+          <text data-single-hover-year x="0" y="0" fill="#f8fafc" font-size="13" font-weight="700"></text>
+          <text data-single-hover-value x="0" y="0" fill="#f59e0b" font-size="13" font-weight="700"></text>
+          <text data-single-hover-invested x="0" y="0" fill="#cbd5e1" font-size="13"></text>
+          <text data-single-hover-yoy x="0" y="0" font-size="13" font-weight="600"></text>
+          <text data-single-hover-total x="0" y="0" font-size="13" font-weight="600"></text>
+          <text data-single-hover-mdd x="0" y="0" fill="#f87171" font-size="13"></text>
+        </g>
+      </svg>
+    </div>
+    <div class="mc-legend">
+      <span><i style="background:#f59e0b"></i>Trajectoire aléatoire (nominal)</span>
+      <span><i style="background:#f87171"></i>Trajectoire (après inflation)</span>
+      <span><i style="background:rgba(148, 163, 184, 0.55)"></i>Total versé</span>
+    </div>
+    <div class="mc-results" aria-live="polite">
+      <article>
+        <span>Valeur finale</span>
+        <strong data-single-result="final">-</strong>
+        <em class="mc-real" data-single-result="final-real">-</em>
+      </article>
+      <article>
+        <span>Plus haut atteint</span>
+        <strong data-single-result="peak">-</strong>
+        <em class="mc-real" data-single-result="peak-real">-</em>
+      </article>
+      <article>
+        <span>Drawdown marché</span>
+        <strong data-single-result="drawdown-market">-</strong>
+      </article>
+      <article>
+        <span>Drawdown portefeuille</span>
+        <strong data-single-result="drawdown">-</strong>
+      </article>
+    </div>
+  </div>
+</section>
+
+<script>
+  const root = document.querySelector('[data-monte-carlo]');
+
+  if (root) {
+    const svg = root.querySelector('[data-svg]') as SVGSVGElement | null;
+
+    const VIEW_W = 900;
+    const VIEW_H = 420;
+    const PAD_LEFT = 70;
+    const PAD_RIGHT = 20;
+    const PAD_TOP = 24;
+    const PAD_BOTTOM = 36;
+
+    const SINGLE_VIEW_W = 900;
+    const SINGLE_VIEW_H = 360;
+
+    const formatter = new Intl.NumberFormat('fr-FR', {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 0,
+    });
+
+    const compactFormatter = new Intl.NumberFormat('fr-FR', {
+      notation: 'compact',
+      maximumFractionDigits: 1,
+      style: 'currency',
+      currency: 'EUR',
+    });
+
+    const normalRandom = () => {
+      const u = Math.max(Math.random(), Number.EPSILON);
+      const v = Math.max(Math.random(), Number.EPSILON);
+      return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    };
+
+    const percentile = (sorted: number[], target: number) => {
+      if (sorted.length === 0) return 0;
+      const rank = (target / 100) * (sorted.length - 1);
+      const lower = Math.floor(rank);
+      const upper = Math.ceil(rank);
+      if (lower === upper) return sorted[lower];
+      const weight = rank - lower;
+      return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+    };
+
+    const getNumber = (name: string) => {
+      const input = root.querySelector(`[data-input="${name}"]`);
+      return input instanceof HTMLInputElement ? Number(input.value) : 0;
+    };
+
+    const getCheckbox = (name: string) => {
+      const input = root.querySelector(`[data-input="${name}"]`);
+      return input instanceof HTMLInputElement ? input.checked : false;
+    };
+
+    // Calibrate monthly volatility so that the *expected* peak-to-trough
+    // drawdown of a market index (GBM with monthly steps, no contributions)
+    // over the chosen horizon roughly matches the user-provided
+    // `maxDrawdown`. Empirically, for a moderate Sharpe ratio,
+    //   E[MDD] - Ï_annual à -T à 0.6
+    // so Ï_annual = maxDrawdown / (-T à 0.6) and Ï_monthly = Ï_annual / -12.
+    const computeMonthlyVol = (maxDrawdown: number, years: number) => {
+      const annualVol = maxDrawdown / (Math.sqrt(Math.max(1, years)) * 0.6);
+      return Math.max(0.005, annualVol / Math.sqrt(12));
+    };
+
+    const setText = (selector: string, text: string) => {
+      const el = root.querySelector(selector);
+      if (el) el.textContent = text;
+    };
+
+    // Toggle a visual "running" state on action buttons during heavy work.
+    // Each button keeps its original label in `data-run-label`.
+    const runButtons = root.querySelectorAll<HTMLButtonElement>('[data-run], [data-single-run], [data-optimize]');
+    const setRunningState = (isRunning: boolean, label = 'Simulation en cours...') => {
+      runButtons.forEach((btn) => {
+        if (isRunning) {
+          if (!btn.dataset.runLabel) btn.dataset.runLabel = btn.textContent ?? '';
+          btn.textContent = label;
+          btn.disabled = true;
+          btn.classList.add('is-running');
+        } else {
+          if (btn.dataset.runLabel) btn.textContent = btn.dataset.runLabel;
+          btn.disabled = false;
+          btn.classList.remove('is-running');
+        }
+      });
+    };
+
+    // Yield to the browser so the disabled style and new label paint before
+    // the synchronous Monte Carlo work blocks the main thread.
+    const withRunning = (work: () => void, label?: string) => {
+      setRunningState(true, label);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          try { work(); } finally { setRunningState(false); }
+        });
+      });
+    };
+
+    type YearSeries = {
+      years: number[];
+      p10: number[];
+      p50: number[];
+      p90: number[];
+    };
+
+    type MonthlySeries = {
+      p10: number[];
+      p50: number[];
+      p90: number[];
+    };
+
+    let lastSeries: YearSeries | null = null;
+    let lastMonthlySeries: MonthlySeries | null = null;
+    let lastInvested: number[] = [];
+    let lastCurrentAge = 30;
+    let lastTarget = 0;
+    let lastInflation = 0.02;
+    let lastTotalYears = 0;
+    let mainZoomStartYear = 0;
+    let mainZoomEndYear = 0;
+    let lastMainMinVal = 0;
+    let lastMainMaxVal = 1;
+    let lastSinglePath: number[] = [];
+    let lastSingleInvested: number[] = [];
+    let lastSingleDrawdownYearly: number[] = [];
+    let lastSinglePathMonthly: number[] = [];
+    let lastSingleInvestedMonthly: number[] = [];
+    let lastSingleDrawdownMonthly: number[] = [];
+    let singleZoomStartYear = 0;
+    let singleZoomEndYear = 0;
+    let lastSingleMinVal = 0;
+    let lastSingleMaxVal = 1;
+
+    // Drag-to-zoom state
+    let mainDragStartX: number | null = null;
+    let mainIsDragging = false;
+    let singleDragStartX: number | null = null;
+    let singleIsDragging = false;
+
+    // Reads the three age inputs and returns the derived horizon (years) and
+    // contribution-stop month. Values are clamped so retirementAge stays > currentAge
+    // and stopAge stays in [currentAge, retirementAge].
+    const readAges = () => {
+      const currentAge = Math.max(0, Math.min(99, Math.round(getNumber('currentAge'))));
+      const retirementRaw = Math.max(1, Math.min(99, Math.round(getNumber('retirementAge'))));
+      const stopRaw = Math.max(0, Math.min(99, Math.round(getNumber('stopAge'))));
+      const retirementAge = Math.max(currentAge + 1, retirementRaw);
+      const stopAge = Math.min(retirementAge, Math.max(currentAge, stopRaw));
+      const years = retirementAge - currentAge;
+      // stopMonthlyAtMonth = 0 means "never stop within the horizon".
+      const stopMonthlyAtMonth = stopAge < retirementAge ? (stopAge - currentAge) * 12 : 0;
+      return { currentAge, retirementAge, stopAge, years, stopMonthlyAtMonth };
+    };
+
+    const setInputValue = (name: string, value: number) => {
+      const input = root.querySelector(`[data-input="${name}"]`);
+      if (input instanceof HTMLInputElement) {
+        const rounded = value >= 1000 ? Math.round(value / 50) * 50 : Math.round(value);
+        input.value = String(Math.max(0, rounded));
+      }
+    };
+
+    const xForYear = (yearIndex: number, totalYears: number) => {
+      if (totalYears <= 0) return PAD_LEFT;
+      return PAD_LEFT + (yearIndex / totalYears) * (VIEW_W - PAD_LEFT - PAD_RIGHT);
+    };
+
+    const yForValue = (value: number, minVal: number, maxVal: number) => {
+      const range = Math.max(maxVal - minVal, 1);
+      return VIEW_H - PAD_BOTTOM - ((value - minVal) / range) * (VIEW_H - PAD_TOP - PAD_BOTTOM);
+    };
+
+    const buildPath = (values: number[], minVal: number, maxVal: number) => {
+      return values
+        .map((v, i) => `${i === 0 ? 'M' : 'L'} ${xForYear(i, values.length - 1).toFixed(2)} ${yForValue(v, minVal, maxVal).toFixed(2)}`)
+        .join(' ');
+    };
+
+    
+    // Format an x-axis label: monthly mode shows "30a 6m" style, yearly shows "30 ans"
+    const formatAgeLabel = (absoluteMonth: number, currentAge: number, isMonthly: boolean) => {
+      if (!isMonthly) {
+        const yr = absoluteMonth / 12;
+        return `${currentAge + yr} ans`;
+      }
+      const yr = Math.floor(absoluteMonth / 12);
+      const mo = absoluteMonth % 12;
+      if (mo === 0) return `${currentAge + yr} ans`;
+      return `${currentAge + yr}a ${mo}m`;
+    };
+
+    const renderAxes = (minVal: number, maxVal: number, totalPoints: number, currentAge: number, isMonthly = false, startAbsoluteMonth = 0) => {
+      const grid = root.querySelector('[data-grid]');
+      const yLabels = root.querySelector('[data-y-labels]');
+      const xLabels = root.querySelector('[data-x-labels]');
+      if (!grid || !yLabels || !xLabels) return;
+
+      grid.innerHTML = '';
+      yLabels.innerHTML = '';
+      xLabels.innerHTML = '';
+
+      const yTicks = 5;
+      for (let i = 0; i <= yTicks; i += 1) {
+        const t = i / yTicks;
+        const y = PAD_TOP + t * (VIEW_H - PAD_TOP - PAD_BOTTOM);
+        const value = maxVal - t * (maxVal - minVal);
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', String(PAD_LEFT));
+        line.setAttribute('x2', String(VIEW_W - PAD_RIGHT));
+        line.setAttribute('y1', y.toFixed(2));
+        line.setAttribute('y2', y.toFixed(2));
+        line.setAttribute('stroke', 'rgba(148, 163, 184, 0.18)');
+        line.setAttribute('stroke-width', '1');
+        grid.appendChild(line);
+
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', String(PAD_LEFT - 8));
+        label.setAttribute('y', (y + 4).toFixed(2));
+        label.setAttribute('text-anchor', 'end');
+        label.setAttribute('fill', '#94a3b8');
+        label.setAttribute('font-size', '12');
+        label.textContent = compactFormatter.format(value);
+        yLabels.appendChild(label);
+      }
+
+      // For monthly mode we show more x-ticks (every month up to 12 ticks).
+      // For yearly mode keep existing behaviour (up to 10 ticks).
+      const maxTicks = isMonthly ? Math.min(totalPoints - 1, 12) : Math.min(totalPoints - 1, 10);
+      const step = (totalPoints - 1) / Math.max(maxTicks, 1);
+      for (let i = 0; i <= maxTicks; i += 1) {
+        const idx = Math.round(i * step);
+        const x = xForYear(idx, totalPoints - 1);
+        const absoluteMonth = startAbsoluteMonth + (isMonthly ? idx : idx * 12);
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', x.toFixed(2));
+        label.setAttribute('y', String(VIEW_H - PAD_BOTTOM + 18));
+        label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('fill', '#94a3b8');
+        label.setAttribute('font-size', '12');
+        label.textContent = formatAgeLabel(absoluteMonth, currentAge, isMonthly);
+        xLabels.appendChild(label);
+      }
+    };
+
+    // Renders the main MC chart for the given year window (supports monthly detail).
+    const renderMainChart = (startYear: number, endYear: number) => {
+      if (!lastSeries || !lastMonthlySeries) return;
+      const span = endYear - startYear;
+            const startMonth = Math.round(startYear * 12);
+      const endMonth = Math.round(endYear * 12);
+      const p10Data = lastMonthlySeries!.p10.slice(startMonth, endMonth + 1);
+      const p50Data = lastMonthlySeries!.p50.slice(startMonth, endMonth + 1);
+      const p90Data = lastMonthlySeries!.p90.slice(startMonth, endMonth + 1);
+      const investedData = Array.from({ length: endMonth - startMonth + 1 }, (_, i) => {
+        const m = startMonth + i;
+        const yIdx = Math.floor(m / 12);
+        return lastInvested[Math.min(yIdx, lastInvested.length - 1)];
+      });
+      const isMonthly = true;
+      const startAbsoluteMonth = startMonth;
+
+      const deflate = (v: number, absMonth: number) => v / Math.pow(1 + lastInflation, absMonth / 12);
+      const p50Real = p50Data.map((v, i) =>
+        deflate(v, startAbsoluteMonth + (isMonthly ? i : i * 12))
+      );
+
+      const minVal = Math.min(...p10Data, ...investedData) * 0.95;
+      const maxVal = Math.max(...p90Data, lastTarget > 0 ? lastTarget : 0) * 1.05;
+      lastMainMinVal = minVal;
+      lastMainMaxVal = maxVal;
+
+      renderAxes(minVal, maxVal, p10Data.length, lastCurrentAge, isMonthly, startAbsoluteMonth);
+
+      const p10El = root.querySelector('[data-p10]');
+      const p50El = root.querySelector('[data-p50]');
+      const p50RealEl = root.querySelector('[data-p50-real]');
+      const p90El = root.querySelector('[data-p90]');
+      const bandEl = root.querySelector('[data-band]');
+
+      p10El?.setAttribute('d', buildPath(p10Data, minVal, maxVal));
+      p50El?.setAttribute('d', buildPath(p50Data, minVal, maxVal));
+      p90El?.setAttribute('d', buildPath(p90Data, minVal, maxVal));
+      p50RealEl?.setAttribute('d', buildPath(p50Real, minVal, maxVal));
+
+      const n = p90Data.length;
+      const upper = p90Data
+        .map((v, i) => `${i === 0 ? 'M' : 'L'} ${xForYear(i, n - 1).toFixed(2)} ${yForValue(v, minVal, maxVal).toFixed(2)}`)
+        .join(' ');
+      const lower = p10Data
+        .map((_, i) => `L ${xForYear(n - 1 - i, n - 1).toFixed(2)} ${yForValue(p10Data[n - 1 - i], minVal, maxVal).toFixed(2)}`)
+        .join(' ');
+      bandEl?.setAttribute('d', `${upper} ${lower} Z`);
+
+      const targetLine = root.querySelector('[data-target-line]') as SVGLineElement | null;
+      const targetLabel = root.querySelector('[data-target-label]') as SVGTextElement | null;
+      if (targetLine && targetLabel) {
+        if (lastTarget > 0 && lastTarget >= minVal && lastTarget <= maxVal) {
+          const ty = yForValue(lastTarget, minVal, maxVal);
+          targetLine.setAttribute('x1', String(PAD_LEFT));
+          targetLine.setAttribute('x2', String(VIEW_W - PAD_RIGHT));
+          targetLine.setAttribute('y1', ty.toFixed(2));
+          targetLine.setAttribute('y2', ty.toFixed(2));
+          targetLine.style.display = '';
+          targetLabel.setAttribute('x', String(VIEW_W - PAD_RIGHT - 4));
+          targetLabel.setAttribute('y', (ty - 4).toFixed(2));
+          targetLabel.textContent = `Objectif ${formatter.format(lastTarget)}`;
+          targetLabel.style.display = '';
+        } else {
+          targetLine.style.display = 'none';
+          targetLabel.style.display = 'none';
+        }
+      }
+
+      // Update zoom info banner
+      const zoomInfo = root.querySelector('[data-zoom-info]') as HTMLDivElement | null;
+      const zoomInfoText = root.querySelector('[data-zoom-info-text]') as HTMLElement | null;
+      const isZoomed = startYear > 0 || endYear < lastTotalYears;
+      if (zoomInfo) zoomInfo.hidden = !isZoomed;
+      if (isZoomed && zoomInfoText) {
+        const modeLabel = ' · vue mensuelle';
+        const startLabel = formatAgeLabel(Math.round(startYear) * 12, lastCurrentAge, false);
+        const endLabel = formatAgeLabel(Math.round(endYear) * 12, lastCurrentAge, false);
+        zoomInfoText.textContent = `Zoom : ${startLabel} - ${endLabel}${modeLabel}`;
+      }
+    };
+
+    type SimulationParams = {
+      initial: number;
+      monthly: number;
+      monthlyReturn: number;
+      monthlyVolatility: number;
+      months: number;
+      targetDrawdown: number;
+      forceDrawdown: boolean;
+      stopMonthlyAtMonth: number; // 0 = never stop
+    };
+
+    type SimulationResult = {
+      yearlyValues: number[];
+      investedYearly: number[];
+      portfolioDrawdownYearly: number[];
+      monthlyValues: number[];
+      monthlyInvested: number[];
+      monthlyDrawdown: number[];
+      finalValue: number;
+      peakValue: number;
+      portfolioMaxDrawdown: number;
+      marketMaxDrawdown: number;
+    };
+
+    // Generates monthly returns and optionally injects a controlled crash so
+    // that the path experiences at least one peak-to-trough drop of
+    // approximately `targetDrawdown` on the underlying market index.
+    const generateReturns = (
+      monthlyReturn: number,
+      monthlyVol: number,
+      months: number,
+      forceDrawdown: boolean,
+      targetDrawdown: number,
+    ): number[] => {
+      const returns: number[] = new Array(months);
+      for (let m = 0; m < months; m += 1) {
+        returns[m] = monthlyReturn + normalRandom() * monthlyVol;
+      }
+
+      if (forceDrawdown && targetDrawdown > 0 && months > 12) {
+        // Random crash window of 3 to 9 months, starting between 10% and 85%
+        // of the horizon. Spread the loss evenly across that window.
+        const crashLen = 3 + Math.floor(Math.random() * 7);
+        const earliest = Math.max(3, Math.floor(months * 0.1));
+        const latest = Math.max(earliest + 1, Math.floor(months * 0.85) - crashLen);
+        const start = earliest + Math.floor(Math.random() * Math.max(1, latest - earliest));
+        const perMonth = Math.pow(1 - targetDrawdown, 1 / crashLen) - 1;
+        for (let i = 0; i < crashLen && start + i < months; i += 1) {
+          returns[start + i] = perMonth;
+        }
+      }
+
+      return returns;
+    };
+
+    const simulatePath = (params: SimulationParams): SimulationResult => {
+      const { initial, monthly, monthlyReturn, monthlyVolatility, months, targetDrawdown, forceDrawdown, stopMonthlyAtMonth } = params;
+      const returns = generateReturns(monthlyReturn, monthlyVolatility, months, forceDrawdown, targetDrawdown);
+
+      const yearlyValues: number[] = [initial];
+      const investedYearly: number[] = [initial];
+      const portfolioDrawdownYearly: number[] = [0];
+      const monthlyValues: number[] = [initial];
+      const monthlyInvested: number[] = [initial];
+      const monthlyDrawdown: number[] = [0];
+      let value = initial;
+      let peak = initial;
+      let portfolioMaxDrawdown = 0;
+      let marketIndex = 1;
+      let marketPeak = 1;
+      let marketMaxDrawdown = 0;
+      let totalInvested = initial;
+
+      for (let month = 1; month <= months; month += 1) {
+        const r = returns[month - 1];
+        const contribute = stopMonthlyAtMonth <= 0 || month <= stopMonthlyAtMonth;
+        const cashflow = contribute ? monthly : 0;
+        value = Math.max(0, value * (1 + r) + cashflow);
+        totalInvested += cashflow;
+        peak = Math.max(peak, value);
+        const dd = peak > 0 ? (peak - value) / peak : 0;
+        if (dd > portfolioMaxDrawdown) portfolioMaxDrawdown = dd;
+        marketIndex = Math.max(0, marketIndex * (1 + r));
+        marketPeak = Math.max(marketPeak, marketIndex);
+        const mdd = marketPeak > 0 ? (marketPeak - marketIndex) / marketPeak : 0;
+        if (mdd > marketMaxDrawdown) marketMaxDrawdown = mdd;
+        monthlyValues.push(value);
+        monthlyInvested.push(totalInvested);
+        monthlyDrawdown.push(portfolioMaxDrawdown);
+        if (month % 12 === 0) {
+          yearlyValues.push(value);
+          investedYearly.push(totalInvested);
+          portfolioDrawdownYearly.push(portfolioMaxDrawdown);
+        }
+      }
+
+      return {
+        yearlyValues,
+        investedYearly,
+        portfolioDrawdownYearly,
+        monthlyValues,
+        monthlyInvested,
+        monthlyDrawdown,
+        finalValue: value,
+        peakValue: peak,
+        portfolioMaxDrawdown,
+        marketMaxDrawdown,
+      };
+    };
+
+    const runSimulation = () => {
+      const initial = Math.max(0, getNumber('initial'));
+      const monthly = Math.max(0, getNumber('monthly'));
+      const cagr = getNumber('cagr') / 100;
+      const inflation = Math.max(-0.5, Math.min(0.5, getNumber('inflation') / 100));
+      const maxDrawdown = Math.max(0, Math.min(0.95, getNumber('drawdown') / 100));
+      const { currentAge, years, stopMonthlyAtMonth } = readAges();
+      const pathCount = Math.max(1000, Math.min(50000, Math.round(getNumber('paths'))));
+      const forceDrawdown = getCheckbox('forceDrawdown');
+      const target = Math.max(0, getNumber('target'));
+
+      const months = years * 12;
+      const monthlyReturn = Math.pow(1 + cagr, 1 / 12) - 1;
+      const monthlyVolatility = computeMonthlyVol(maxDrawdown, years);
+
+      const params: SimulationParams = {
+        initial, monthly, monthlyReturn, monthlyVolatility, months,
+        targetDrawdown: maxDrawdown, forceDrawdown, stopMonthlyAtMonth,
+      };
+
+      const yearValues: number[][] = Array.from({ length: years + 1 }, () => []);
+      // Limit monthly collection to keep memory reasonable on high path counts
+      const MONTHLY_CAP = Math.min(pathCount, 5000);
+      const monthValues: number[][] = Array.from({ length: months + 1 }, () => []);
+      const investedAtYear: number[] = Array.from({ length: years + 1 }, (_, y) => {
+        const monthsAtYear = y * 12;
+        const monthsContributing = stopMonthlyAtMonth > 0 ? Math.min(monthsAtYear, stopMonthlyAtMonth) : monthsAtYear;
+        return initial + monthly * monthsContributing;
+      });
+      let drawdownSum = 0;
+
+      for (let p = 0; p < pathCount; p += 1) {
+        const sim = simulatePath(params);
+        for (let y = 0; y <= years; y += 1) {
+          yearValues[y].push(sim.yearlyValues[y]);
+        }
+        if (p < MONTHLY_CAP) {
+          for (let m = 0; m <= months; m += 1) {
+            monthValues[m].push(sim.monthlyValues[m]);
+          }
+        }
+        drawdownSum += sim.marketMaxDrawdown;
+      }
+
+      const avgMarketDrawdown = pathCount > 0 ? drawdownSum / pathCount : 0;
+
+      const series: YearSeries = {
+        years: Array.from({ length: years + 1 }, (_, i) => i),
+        p10: [],
+        p50: [],
+        p90: [],
+      };
+
+      yearValues.forEach((vals) => {
+        const sorted = [...vals].sort((a, b) => a - b);
+        series.p10.push(percentile(sorted, 10));
+        series.p50.push(percentile(sorted, 50));
+        series.p90.push(percentile(sorted, 90));
+      });
+
+      const monthlySeries: MonthlySeries = { p10: [], p50: [], p90: [] };
+      monthValues.forEach((vals) => {
+        const sorted = [...vals].sort((a, b) => a - b);
+        monthlySeries.p10.push(percentile(sorted, 10));
+        monthlySeries.p50.push(percentile(sorted, 50));
+        monthlySeries.p90.push(percentile(sorted, 90));
+      });
+
+      lastSeries = series;
+      lastMonthlySeries = monthlySeries;
+      lastInvested = investedAtYear;
+      lastCurrentAge = currentAge;
+      lastTarget = target;
+      lastInflation = inflation;
+      lastTotalYears = years;
+      mainZoomStartYear = 0;
+      mainZoomEndYear = years;
+
+      const deflate = (v: number, y: number) => v / Math.pow(1 + inflation, y);
+
+      setText('[data-result="invested"]', formatter.format(investedAtYear[years]));
+      setText('[data-result="p10"]', formatter.format(series.p10[years]));
+      setText('[data-result="p50"]', formatter.format(series.p50[years]));
+      setText('[data-result="p90"]', formatter.format(series.p90[years]));
+      setText('[data-result="avg-dd"]', `${(avgMarketDrawdown * 100).toFixed(1)} %`);
+
+      const realSuffix = (v: number) => `après inflation : ${formatter.format(deflate(v, years))}`;
+      setText('[data-result="invested-real"]', realSuffix(investedAtYear[years]));
+      setText('[data-result="p10-real"]', realSuffix(series.p10[years]));
+      setText('[data-result="p50-real"]', realSuffix(series.p50[years]));
+      setText('[data-result="p90-real"]', realSuffix(series.p90[years]));
+
+      renderMainChart(0, years);
+      hideCursor();
+      runSingleSimulation();
+    };
+
+    // --- Single trajectory chart ---------------------------------------------
+    const SINGLE_PAD_LEFT = 70;
+    const SINGLE_PAD_RIGHT = 20;
+    const SINGLE_PAD_TOP = 24;
+    const SINGLE_PAD_BOTTOM = 36;
+
+    const singleSvg = root.querySelector('[data-single-svg]') as SVGSVGElement | null;
+
+    const xForYearSingle = (yearIndex: number, totalYears: number) => {
+      if (totalYears <= 0) return SINGLE_PAD_LEFT;
+      return SINGLE_PAD_LEFT + (yearIndex / totalYears) * (SINGLE_VIEW_W - SINGLE_PAD_LEFT - SINGLE_PAD_RIGHT);
+    };
+
+    const yForValueSingle = (value: number, minVal: number, maxVal: number) => {
+      const range = Math.max(maxVal - minVal, 1);
+      return SINGLE_VIEW_H - SINGLE_PAD_BOTTOM - ((value - minVal) / range) * (SINGLE_VIEW_H - SINGLE_PAD_TOP - SINGLE_PAD_BOTTOM);
+    };
+
+    const renderSingleAxes = (minVal: number, maxVal: number, totalPoints: number, currentAge: number, isMonthly = false, startAbsoluteMonth = 0) => {
+      const grid = root.querySelector('[data-single-grid]');
+      const yLabels = root.querySelector('[data-single-y-labels]');
+      const xLabels = root.querySelector('[data-single-x-labels]');
+      if (!grid || !yLabels || !xLabels) return;
+
+      grid.innerHTML = '';
+      yLabels.innerHTML = '';
+      xLabels.innerHTML = '';
+
+      const yTicks = 5;
+      for (let i = 0; i <= yTicks; i += 1) {
+        const t = i / yTicks;
+        const y = SINGLE_PAD_TOP + t * (SINGLE_VIEW_H - SINGLE_PAD_TOP - SINGLE_PAD_BOTTOM);
+        const value = maxVal - t * (maxVal - minVal);
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', String(SINGLE_PAD_LEFT));
+        line.setAttribute('x2', String(SINGLE_VIEW_W - SINGLE_PAD_RIGHT));
+        line.setAttribute('y1', y.toFixed(2));
+        line.setAttribute('y2', y.toFixed(2));
+        line.setAttribute('stroke', 'rgba(148, 163, 184, 0.18)');
+        line.setAttribute('stroke-width', '1');
+        grid.appendChild(line);
+
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', String(SINGLE_PAD_LEFT - 8));
+        label.setAttribute('y', (y + 4).toFixed(2));
+        label.setAttribute('text-anchor', 'end');
+        label.setAttribute('fill', '#94a3b8');
+        label.setAttribute('font-size', '12');
+        label.textContent = compactFormatter.format(value);
+        yLabels.appendChild(label);
+      }
+
+      const maxTicks = isMonthly ? Math.min(totalPoints - 1, 12) : Math.min(totalPoints - 1, 10);
+      const step = (totalPoints - 1) / Math.max(maxTicks, 1);
+      for (let i = 0; i <= maxTicks; i += 1) {
+        const idx = Math.round(i * step);
+        const x = xForYearSingle(idx, totalPoints - 1);
+        const absoluteMonth = startAbsoluteMonth + (isMonthly ? idx : idx * 12);
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', x.toFixed(2));
+        label.setAttribute('y', String(SINGLE_VIEW_H - SINGLE_PAD_BOTTOM + 18));
+        label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('fill', '#94a3b8');
+        label.setAttribute('font-size', '12');
+        label.textContent = formatAgeLabel(absoluteMonth, currentAge, isMonthly);
+        xLabels.appendChild(label);
+      }
+    };
+
+    const buildPathSingle = (values: number[], minVal: number, maxVal: number) => {
+      return values
+        .map((v, i) => `${i === 0 ? 'M' : 'L'} ${xForYearSingle(i, values.length - 1).toFixed(2)} ${yForValueSingle(v, minVal, maxVal).toFixed(2)}`)
+        .join(' ');
+    };
+
+    // Renders the single-trajectory chart for the given year window.
+    const renderSingleChart = (startYear: number, endYear: number) => {
+      if (lastSinglePath.length === 0) return;
+      const totalYears = lastSinglePath.length - 1;
+      const span = endYear - startYear;
+            const startMonth = Math.round(startYear * 12);
+      const endMonth = Math.round(endYear * 12);
+      const pathData = lastSinglePathMonthly.slice(startMonth, endMonth + 1);
+      const investedData = lastSingleInvestedMonthly.slice(startMonth, endMonth + 1);
+      const drawdownData = lastSingleDrawdownMonthly.slice(startMonth, endMonth + 1);
+      const realData = pathData.map((v, i) => v / Math.pow(1 + lastInflation, (startMonth + i) / 12));
+      const isMonthly = true;
+      const startAbsoluteMonth = startMonth;
+
+      const minVal = Math.min(...pathData, ...investedData, 0) * 0.95;
+      const maxVal = Math.max(...pathData, ...investedData) * 1.05;
+      lastSingleMinVal = minVal;
+      lastSingleMaxVal = maxVal;
+
+      renderSingleAxes(minVal, maxVal, pathData.length, lastCurrentAge, isMonthly, startAbsoluteMonth);
+
+      const pathEl = root.querySelector('[data-single-path]');
+      const investedEl = root.querySelector('[data-single-invested]');
+      const realEl = root.querySelector('[data-single-real]');
+
+      pathEl?.setAttribute('d', buildPathSingle(pathData, minVal, maxVal));
+      investedEl?.setAttribute('d', buildPathSingle(investedData, minVal, maxVal));
+      realEl?.setAttribute('d', buildPathSingle(realData, minVal, maxVal));
+
+      // Update zoom info banner
+      const sZoomInfo = root.querySelector('[data-single-zoom-info]') as HTMLDivElement | null;
+      const sZoomInfoText = root.querySelector('[data-single-zoom-info-text]') as HTMLElement | null;
+      const isZoomed = startYear > 0 || endYear < totalYears;
+      if (sZoomInfo) sZoomInfo.hidden = !isZoomed;
+      if (isZoomed && sZoomInfoText) {
+        const modeLabel = ' · vue mensuelle';
+        const startLabel = formatAgeLabel(Math.round(startYear) * 12, lastCurrentAge, false);
+        const endLabel = formatAgeLabel(Math.round(endYear) * 12, lastCurrentAge, false);
+        sZoomInfoText.textContent = `Zoom : ${startLabel} - ${endLabel}${modeLabel}`;
+      }
+    };
+
+    const runSingleSimulation = () => {
+      const initial = Math.max(0, getNumber('initial'));
+      const monthly = Math.max(0, getNumber('monthly'));
+      const cagr = getNumber('cagr') / 100;
+      const inflation = Math.max(-0.5, Math.min(0.5, getNumber('inflation') / 100));
+      const maxDrawdown = Math.max(0, Math.min(0.95, getNumber('drawdown') / 100));
+      const { currentAge, years, stopMonthlyAtMonth } = readAges();
+      const forceDrawdown = getCheckbox('forceDrawdown');
+
+      const months = years * 12;
+      const monthlyReturn = Math.pow(1 + cagr, 1 / 12) - 1;
+      const monthlyVolatility = computeMonthlyVol(maxDrawdown, years);
+
+      const params: SimulationParams = {
+        initial, monthly, monthlyReturn, monthlyVolatility, months,
+        targetDrawdown: maxDrawdown, forceDrawdown, stopMonthlyAtMonth,
+      };
+
+      // Restrict the example trajectory to a scenario whose final value falls
+      // between the p10 and p90 of the Monte Carlo distribution, so the user
+      // does not see an example that contradicts the "pessimiste / optimiste"
+      // bounds displayed above. Fall back to the last candidate after a few
+      // tries to avoid an infinite loop on extreme parameters.
+      let chosen = simulatePath(params);
+      if (lastSeries) {
+        const lowerBound = lastSeries.p10[years];
+        const upperBound = lastSeries.p90[years];
+        const MAX_ATTEMPTS = 40;
+        let attempts = 1;
+        while (
+          attempts < MAX_ATTEMPTS &&
+          (chosen.finalValue < lowerBound || chosen.finalValue > upperBound)
+        ) {
+          chosen = simulatePath(params);
+          attempts += 1;
+        }
+      }
+
+      lastSinglePath = chosen.yearlyValues;
+      lastSingleInvested = chosen.investedYearly;
+      lastSingleDrawdownYearly = chosen.portfolioDrawdownYearly;
+      lastSinglePathMonthly = chosen.monthlyValues;
+      lastSingleInvestedMonthly = chosen.monthlyInvested;
+      lastSingleDrawdownMonthly = chosen.monthlyDrawdown;
+      singleZoomStartYear = 0;
+      singleZoomEndYear = years;
+
+      setText('[data-single-result="final"]', formatter.format(chosen.finalValue));
+      setText('[data-single-result="peak"]', formatter.format(chosen.peakValue));
+      setText('[data-single-result="drawdown"]', `${(chosen.portfolioMaxDrawdown * 100).toFixed(1)} %`);
+      setText('[data-single-result="drawdown-market"]', `${(chosen.marketMaxDrawdown * 100).toFixed(1)} %`);
+      setText('[data-single-result="final-real"]', `après inflation : ${formatter.format(chosen.finalValue / Math.pow(1 + inflation, years))}`);
+      setText('[data-single-result="peak-real"]', `après inflation : ${formatter.format(chosen.peakValue / Math.pow(1 + inflation, years))}`);
+
+      renderSingleChart(0, years);
+      hideSingleCursor();
+    };
+
+        const hideSingleCursor = () => {
+      const cursor = root.querySelector('[data-single-cursor]') as SVGLineElement | null;
+      const dot = root.querySelector('[data-single-dot]') as SVGCircleElement | null;
+      const labels = root.querySelector('[data-single-hover-labels]') as SVGGElement | null;
+      if (cursor) cursor.style.display = 'none';
+      if (dot) dot.style.display = 'none';
+      if (labels) labels.style.display = 'none';
+    };
+
+    const showAtPointerSingle = (clientX: number) => {
+      if (singleDragStartX !== null) return;
+      if (!singleSvg || lastSinglePath.length === 0 || lastSinglePathMonthly.length === 0) return;
+      const rect = singleSvg.getBoundingClientRect();
+      const localX = ((clientX - rect.left) / rect.width) * SINGLE_VIEW_W;
+      if (localX < SINGLE_PAD_LEFT || localX > SINGLE_VIEW_W - SINGLE_PAD_RIGHT) {
+        hideSingleCursor();
+        return;
+      }
+
+      const startYear = singleZoomStartYear;
+      const endYear = singleZoomEndYear;
+      const ratio = (localX - SINGLE_PAD_LEFT) / (SINGLE_VIEW_W - SINGLE_PAD_LEFT - SINGLE_PAD_RIGHT);
+
+      const startMonth = Math.round(startYear * 12);
+      const endMonth = Math.round(endYear * 12);
+      const totalPoints = endMonth - startMonth;
+      const idx = Math.max(0, Math.min(totalPoints, Math.round(ratio * totalPoints)));
+      const absoluteMonth = startMonth + idx;
+      
+      const pathVal = lastSinglePathMonthly[absoluteMonth] ?? 0;
+      const investedVal = lastSingleInvestedMonthly[absoluteMonth] ?? 0;
+      const drawdownVal = lastSingleDrawdownMonthly[absoluteMonth] ?? 0;
+      const prevPathVal = absoluteMonth > 0 ? (lastSinglePathMonthly[absoluteMonth - 1] ?? pathVal) : pathVal;
+      const prevInvestedVal = absoluteMonth > 0 ? (lastSingleInvestedMonthly[absoluteMonth - 1] ?? investedVal) : investedVal;
+
+      const snapX = xForYearSingle(idx, totalPoints);
+      const yVal = yForValueSingle(pathVal, lastSingleMinVal, lastSingleMaxVal);
+
+      const cursor = root.querySelector('[data-single-cursor]') as SVGLineElement | null;
+      const dot = root.querySelector('[data-single-dot]') as SVGCircleElement | null;
+
+      if (cursor) {
+        cursor.setAttribute('x1', snapX.toFixed(2));
+        cursor.setAttribute('x2', snapX.toFixed(2));
+        cursor.setAttribute('y1', String(SINGLE_PAD_TOP));
+        cursor.setAttribute('y2', String(SINGLE_VIEW_H - SINGLE_PAD_BOTTOM));
+        cursor.style.display = '';
+      }
+      if (dot) {
+        dot.setAttribute('cx', snapX.toFixed(2));
+        dot.setAttribute('cy', yVal.toFixed(2));
+        dot.style.display = '';
+      }
+
+      const labelsGroup = root.querySelector('[data-single-hover-labels]') as SVGGElement | null;
+      const bg = root.querySelector('[data-single-hover-bg]') as SVGRectElement | null;
+      const yearText = root.querySelector('[data-single-hover-year]') as SVGTextElement | null;
+      const valueText = root.querySelector('[data-single-hover-value]') as SVGTextElement | null;
+      const investedText = root.querySelector('[data-single-hover-invested]') as SVGTextElement | null;
+      const yoyText = root.querySelector('[data-single-hover-yoy]') as SVGTextElement | null;
+      const totalText = root.querySelector('[data-single-hover-total]') as SVGTextElement | null;
+      const mddText = root.querySelector('[data-single-hover-mdd]') as SVGTextElement | null;
+
+      if (labelsGroup && bg && yearText && valueText && investedText && yoyText && totalText && mddText) {
+        const ageLabel = formatAgeLabel(absoluteMonth, lastCurrentAge, true);
+        const yearLabel = absoluteMonth === 0 ? `Âge ${lastCurrentAge} ans (aujourd'hui)` : `Âge ${ageLabel}`;
+        const previousContribution = absoluteMonth > 0 ? investedVal - prevInvestedVal : 0;
+        const yoyBase = prevPathVal + previousContribution;
+        const periodLabel = "Croissance mensuelle";
+        const yoyGrowth = yoyBase > 0 ? (pathVal - yoyBase) / yoyBase : 0;
+        const totalGrowth = investedVal > 0 ? (pathVal - investedVal) / investedVal : 0;
+
+        const fmtPct = (v: number) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)} %`;
+        const colorFor = (v: number) => (v >= 0 ? '#4ade80' : '#f87171');
+
+        yearText.textContent = yearLabel;
+        valueText.textContent = `Valeur : ${formatter.format(pathVal)}`;
+        investedText.textContent = `Versé : ${formatter.format(investedVal)}`;
+        yoyText.textContent = absoluteMonth === 0
+          ? `${periodLabel} : —`
+          : `${periodLabel} : ${fmtPct(yoyGrowth)}`;
+        yoyText.setAttribute('fill', absoluteMonth === 0 ? '#cbd5e1' : colorFor(yoyGrowth));
+        totalText.textContent = `Croissance totale : ${fmtPct(totalGrowth)}`;
+        totalText.setAttribute('fill', colorFor(totalGrowth));
+        mddText.textContent = `Drawdown max : ${(drawdownVal * 100).toFixed(1)} %`;
+
+        const boxW = 230;
+        const boxH = 140;
+        const pad = 10;
+        let boxX = snapX + 14;
+        if (boxX + boxW > SINGLE_VIEW_W - 6) boxX = snapX - boxW - 14;
+        if (boxX < 6) boxX = 6;
+        const boxY = SINGLE_PAD_TOP;
+
+        bg.setAttribute('x', boxX.toFixed(2));
+        bg.setAttribute('y', boxY.toFixed(2));
+        bg.setAttribute('width', String(boxW));
+        bg.setAttribute('height', String(boxH));
+
+        const setPos = (el: SVGTextElement, yOffset: number) => {
+          el.setAttribute('x', (boxX + pad).toFixed(2));
+          el.setAttribute('y', (boxY + pad + yOffset).toFixed(2));
+        };
+        setPos(yearText, 14);
+        setPos(valueText, 34);
+        setPos(investedText, 52);
+        setPos(yoyText, 72);
+        setPos(totalText, 90);
+        setPos(mddText, 108);
+
+        labelsGroup.style.display = '';
+      }
+    };
+
+    const hideSingleZoomRect = () => {
+      const el = root.querySelector('[data-single-zoom-rect]') as SVGRectElement | null;
+      if (el) el.style.display = 'none';
+    };
+    const updateSingleZoomRect = (startCX: number, curCX: number) => {
+      if (!singleSvg) return;
+      const r = singleSvg.getBoundingClientRect();
+      const x1 = Math.max(SINGLE_PAD_LEFT, Math.min(SINGLE_VIEW_W - SINGLE_PAD_RIGHT, ((startCX - r.left) / r.width) * SINGLE_VIEW_W));
+      const x2 = Math.max(SINGLE_PAD_LEFT, Math.min(SINGLE_VIEW_W - SINGLE_PAD_RIGHT, ((curCX - r.left) / r.width) * SINGLE_VIEW_W));
+      const el = root.querySelector('[data-single-zoom-rect]') as SVGRectElement | null;
+      if (el) {
+        el.setAttribute('x', Math.min(x1, x2).toFixed(2));
+        el.setAttribute('y', String(SINGLE_PAD_TOP));
+        el.setAttribute('width', Math.abs(x2 - x1).toFixed(2));
+        el.setAttribute('height', String(SINGLE_VIEW_H - SINGLE_PAD_TOP - SINGLE_PAD_BOTTOM));
+        el.style.display = '';
+      }
+    };
+
+    singleSvg?.addEventListener('mousedown', (e) => {
+      if (!singleSvg) return;
+      const r = singleSvg.getBoundingClientRect();
+      const lx = ((e.clientX - r.left) / r.width) * SINGLE_VIEW_W;
+      if (lx >= SINGLE_PAD_LEFT && lx <= SINGLE_VIEW_W - SINGLE_PAD_RIGHT) {
+        singleDragStartX = e.clientX;
+        singleIsDragging = false;
+        e.preventDefault();
+      }
+    });
+    singleSvg?.addEventListener('mousemove', (e) => {
+      if (singleDragStartX !== null) {
+        singleIsDragging = true;
+        updateSingleZoomRect(singleDragStartX, e.clientX);
+      } else {
+        showAtPointerSingle(e.clientX);
+      }
+    });
+    singleSvg?.addEventListener('mouseleave', () => {
+      if (singleDragStartX === null) hideSingleCursor();
+    });
+    singleSvg?.addEventListener('dblclick', () => {
+      singleZoomStartYear = 0;
+      singleZoomEndYear = lastSinglePath.length - 1;
+      renderSingleChart(0, lastSinglePath.length - 1);
+      hideSingleCursor();
+    });
+    singleSvg?.addEventListener('touchmove', (event) => {
+      const touch = event.touches[0];
+      if (touch) {
+        event.preventDefault();
+        showAtPointerSingle(touch.clientX);
+      }
+    }, { passive: false });
+    singleSvg?.addEventListener('touchend', hideSingleCursor);
+
+    root.querySelector('[data-single-run]')?.addEventListener('click', () => withRunning(runSingleSimulation));
+
+        const hideCursor = () => {
+      const cursor = root.querySelector('[data-cursor]') as SVGLineElement | null;
+      const dotP50 = root.querySelector('[data-dot-p50]') as SVGCircleElement | null;
+      const dotP10 = root.querySelector('[data-dot-p10]') as SVGCircleElement | null;
+      const dotP90 = root.querySelector('[data-dot-p90]') as SVGCircleElement | null;
+      const labels = root.querySelector('[data-hover-labels]') as SVGGElement | null;
+      if (cursor) cursor.style.display = 'none';
+      if (dotP50) dotP50.style.display = 'none';
+      if (dotP10) dotP10.style.display = 'none';
+      if (dotP90) dotP90.style.display = 'none';
+      if (labels) labels.style.display = 'none';
+    };
+
+    const showAtPointer = (clientX: number) => {
+      if (mainDragStartX !== null) return;
+      if (!svg || !lastSeries || !lastMonthlySeries) return;
+      const rect = svg.getBoundingClientRect();
+      const localX = ((clientX - rect.left) / rect.width) * VIEW_W;
+      if (localX < PAD_LEFT || localX > VIEW_W - PAD_RIGHT) {
+        hideCursor();
+        return;
+      }
+
+      const startYear = mainZoomStartYear;
+      const endYear = mainZoomEndYear;
+      const ratio = (localX - PAD_LEFT) / (VIEW_W - PAD_LEFT - PAD_RIGHT);
+
+      const startMonth = Math.round(startYear * 12);
+      const endMonth = Math.round(endYear * 12);
+      const totalPoints = endMonth - startMonth;
+      const idx = Math.max(0, Math.min(totalPoints, Math.round(ratio * totalPoints)));
+      const absoluteMonth = startMonth + idx;
+      
+      const p10Val = lastMonthlySeries.p10[absoluteMonth] ?? 0;
+      const p50Val = lastMonthlySeries.p50[absoluteMonth] ?? 0;
+      const p90Val = lastMonthlySeries.p90[absoluteMonth] ?? 0;
+
+      const snapX = xForYear(idx, totalPoints);
+      const yP50 = yForValue(p50Val, lastMainMinVal, lastMainMaxVal);
+      const yP10 = yForValue(p10Val, lastMainMinVal, lastMainMaxVal);
+      const yP90 = yForValue(p90Val, lastMainMinVal, lastMainMaxVal);
+
+      const cursor = root.querySelector('[data-cursor]') as SVGLineElement | null;
+      const dotP50 = root.querySelector('[data-dot-p50]') as SVGCircleElement | null;
+      const dotP10 = root.querySelector('[data-dot-p10]') as SVGCircleElement | null;
+      const dotP90 = root.querySelector('[data-dot-p90]') as SVGCircleElement | null;
+
+      if (cursor) {
+        cursor.setAttribute('x1', snapX.toFixed(2));
+        cursor.setAttribute('x2', snapX.toFixed(2));
+        cursor.setAttribute('y1', String(PAD_TOP));
+        cursor.setAttribute('y2', String(VIEW_H - PAD_BOTTOM));
+        cursor.style.display = '';
+      }
+      if (dotP50) {
+        dotP50.setAttribute('cx', snapX.toFixed(2));
+        dotP50.setAttribute('cy', yP50.toFixed(2));
+        dotP50.style.display = '';
+      }
+      if (dotP10) {
+        dotP10.setAttribute('cx', snapX.toFixed(2));
+        dotP10.setAttribute('cy', yP10.toFixed(2));
+        dotP10.style.display = '';
+      }
+      if (dotP90) {
+        dotP90.setAttribute('cx', snapX.toFixed(2));
+        dotP90.setAttribute('cy', yP90.toFixed(2));
+        dotP90.style.display = '';
+      }
+
+      const labelsGroup = root.querySelector('[data-hover-labels]') as SVGGElement | null;
+      const bg = root.querySelector('[data-hover-bg]') as SVGRectElement | null;
+      const yearText = root.querySelector('[data-hover-year]') as SVGTextElement | null;
+      const p90Text = root.querySelector('[data-hover-p90]') as SVGTextElement | null;
+      const p50Text = root.querySelector('[data-hover-p50]') as SVGTextElement | null;
+      const p10Text = root.querySelector('[data-hover-p10]') as SVGTextElement | null;
+
+      if (labelsGroup && bg && yearText && p90Text && p50Text && p10Text) {
+        const ageLabel = formatAgeLabel(absoluteMonth, lastCurrentAge, true);
+        const yearLabel = absoluteMonth === 0 ? `Âge ${lastCurrentAge} ans (aujourd'hui)` : `Âge ${ageLabel}`;
+        yearText.textContent = yearLabel;
+        p90Text.textContent = `Optimiste : ${formatter.format(p90Val)}`;
+        p50Text.textContent = `Médian : ${formatter.format(p50Val)}`;
+        p10Text.textContent = `Pessimiste : ${formatter.format(p10Val)}`;
+
+        const boxW = 210;
+        const boxH = 92;
+        const pad = 10;
+        let boxX = snapX + 14;
+        if (boxX + boxW > VIEW_W - 6) boxX = snapX - boxW - 14;
+        if (boxX < 6) boxX = 6;
+        const boxY = Math.max(6, Math.min(VIEW_H - boxH - 6, PAD_TOP));
+
+        bg.setAttribute('x', boxX.toFixed(2));
+        bg.setAttribute('y', boxY.toFixed(2));
+        bg.setAttribute('width', String(boxW));
+        bg.setAttribute('height', String(boxH));
+
+        yearText.setAttribute('x', (boxX + pad).toFixed(2));
+        yearText.setAttribute('y', (boxY + pad + 14).toFixed(2));
+        p90Text.setAttribute('x', (boxX + pad).toFixed(2));
+        p90Text.setAttribute('y', (boxY + pad + 34).toFixed(2));
+        p50Text.setAttribute('x', (boxX + pad).toFixed(2));
+        p50Text.setAttribute('y', (boxY + pad + 52).toFixed(2));
+        p10Text.setAttribute('x', (boxX + pad).toFixed(2));
+        p10Text.setAttribute('y', (boxY + pad + 70).toFixed(2));
+
+        labelsGroup.style.display = '';
+      }
+    };
+
+    const hideMainZoomRect = () => {
+      const el = root.querySelector('[data-zoom-rect]') as SVGRectElement | null;
+      if (el) el.style.display = 'none';
+    };
+    const updateMainZoomRect = (startCX: number, curCX: number) => {
+      if (!svg) return;
+      const r = svg.getBoundingClientRect();
+      const x1 = Math.max(PAD_LEFT, Math.min(VIEW_W - PAD_RIGHT, ((startCX - r.left) / r.width) * VIEW_W));
+      const x2 = Math.max(PAD_LEFT, Math.min(VIEW_W - PAD_RIGHT, ((curCX - r.left) / r.width) * VIEW_W));
+      const el = root.querySelector('[data-zoom-rect]') as SVGRectElement | null;
+      if (el) {
+        el.setAttribute('x', Math.min(x1, x2).toFixed(2));
+        el.setAttribute('y', String(PAD_TOP));
+        el.setAttribute('width', Math.abs(x2 - x1).toFixed(2));
+        el.setAttribute('height', String(VIEW_H - PAD_TOP - PAD_BOTTOM));
+        el.style.display = '';
+      }
+    };
+
+    svg?.addEventListener('mousedown', (e) => {
+      if (!svg) return;
+      const r = svg.getBoundingClientRect();
+      const lx = ((e.clientX - r.left) / r.width) * VIEW_W;
+      if (lx >= PAD_LEFT && lx <= VIEW_W - PAD_RIGHT) {
+        mainDragStartX = e.clientX;
+        mainIsDragging = false;
+        e.preventDefault();
+      }
+    });
+    svg?.addEventListener('mousemove', (e) => {
+      if (mainDragStartX !== null) {
+        mainIsDragging = true;
+        updateMainZoomRect(mainDragStartX, e.clientX);
+      } else {
+        showAtPointer(e.clientX);
+      }
+    });
+    svg?.addEventListener('mouseleave', () => {
+      if (mainDragStartX === null) hideCursor();
+    });
+    svg?.addEventListener('dblclick', () => {
+      mainZoomStartYear = 0;
+      mainZoomEndYear = lastTotalYears;
+      renderMainChart(0, lastTotalYears);
+      hideCursor();
+    });
+    svg?.addEventListener('touchmove', (event) => {
+      const touch = event.touches[0];
+      if (touch) {
+        event.preventDefault();
+        showAtPointer(touch.clientX);
+      }
+    }, { passive: false });
+    svg?.addEventListener('touchend', hideCursor);
+
+    // Window-level mouseup to apply zoom when drag ends (even outside SVG)
+    window.addEventListener('mouseup', (e) => {
+      if (mainDragStartX !== null && mainIsDragging) {
+        const svgRect = svg?.getBoundingClientRect();
+        if (svgRect) {
+          const x1Svg = ((mainDragStartX - svgRect.left) / svgRect.width) * VIEW_W;
+          const x2Svg = ((e.clientX - svgRect.left) / svgRect.width) * VIEW_W;
+          if (Math.abs(x2Svg - x1Svg) >= 10) {
+            const ratio1 = (Math.min(x1Svg, x2Svg) - PAD_LEFT) / (VIEW_W - PAD_LEFT - PAD_RIGHT);
+            const ratio2 = (Math.max(x1Svg, x2Svg) - PAD_LEFT) / (VIEW_W - PAD_LEFT - PAD_RIGHT);
+            const visibleSpan = mainZoomEndYear - mainZoomStartYear;
+            const newStart = mainZoomStartYear + ratio1 * visibleSpan;
+            const newEnd = mainZoomStartYear + ratio2 * visibleSpan;
+            const totalMonths = lastTotalYears * 12;
+            const startM = Math.max(0, Math.round(newStart * 12));
+            const endM = Math.min(totalMonths, Math.round(newEnd * 12));
+            if (endM - startM >= 1) {
+              mainZoomStartYear = startM / 12;
+              mainZoomEndYear = endM / 12;
+              renderMainChart(mainZoomStartYear, mainZoomEndYear);
+            }
+          }
+        }
+        hideCursor();
+        hideMainZoomRect();
+      } else if (mainDragStartX !== null) {
+        hideMainZoomRect();
+      }
+      mainDragStartX = null;
+      mainIsDragging = false;
+
+      if (singleDragStartX !== null && singleIsDragging) {
+        const svgRect = singleSvg?.getBoundingClientRect();
+        if (svgRect) {
+          const x1Svg = ((singleDragStartX - svgRect.left) / svgRect.width) * SINGLE_VIEW_W;
+          const x2Svg = ((e.clientX - svgRect.left) / svgRect.width) * SINGLE_VIEW_W;
+          if (Math.abs(x2Svg - x1Svg) >= 10) {
+            const ratio1 = (Math.min(x1Svg, x2Svg) - SINGLE_PAD_LEFT) / (SINGLE_VIEW_W - SINGLE_PAD_LEFT - SINGLE_PAD_RIGHT);
+            const ratio2 = (Math.max(x1Svg, x2Svg) - SINGLE_PAD_LEFT) / (SINGLE_VIEW_W - SINGLE_PAD_LEFT - SINGLE_PAD_RIGHT);
+            const visibleSpan = singleZoomEndYear - singleZoomStartYear;
+            const newStart = singleZoomStartYear + ratio1 * visibleSpan;
+            const newEnd = singleZoomStartYear + ratio2 * visibleSpan;
+            const totalMonths = (lastSinglePath.length - 1) * 12;
+            const startM = Math.max(0, Math.round(newStart * 12));
+            const endM = Math.min(totalMonths, Math.round(newEnd * 12));
+            if (endM - startM >= 1) {
+              singleZoomStartYear = startM / 12;
+              singleZoomEndYear = endM / 12;
+              renderSingleChart(singleZoomStartYear, singleZoomEndYear);
+            }
+          }
+        }
+        hideSingleCursor();
+        hideSingleZoomRect();
+      } else if (singleDragStartX !== null) {
+        hideSingleZoomRect();
+      }
+      singleDragStartX = null;
+      singleIsDragging = false;
+    });
+
+    root.querySelector('[data-run]')?.addEventListener('click', () => withRunning(runSimulation));
+    root.querySelectorAll('input').forEach((input) => input.addEventListener('change', () => withRunning(runSimulation)));
+
+    root.querySelector('[data-zoom-reset]')?.addEventListener('click', () => {
+      mainZoomStartYear = 0;
+      mainZoomEndYear = lastTotalYears;
+      renderMainChart(0, lastTotalYears);
+      hideCursor();
+    });
+
+    root.querySelector('[data-single-zoom-reset]')?.addEventListener('click', () => {
+      singleZoomStartYear = 0;
+      singleZoomEndYear = lastSinglePath.length - 1;
+      renderSingleChart(0, lastSinglePath.length - 1);
+      hideSingleCursor();
+    });
+
+    // --- Optimization --------------------------------------------------------
+    // Binary-searches either the initial investment or the monthly contribution
+    // so that the median (p50) final value approximately reaches the user's
+    // target. Other parameters stay locked.
+    const estimateMedianFinal = (params: SimulationParams, paths: number) => {
+      const finals: number[] = new Array(paths);
+      for (let i = 0; i < paths; i += 1) finals[i] = simulatePath(params).finalValue;
+      finals.sort((a, b) => a - b);
+      return percentile(finals, 50);
+    };
+
+    const optimize = (variable: 'initial' | 'monthly') => {
+      const target = Math.max(0, getNumber('target'));
+      const resultBox = root.querySelector('[data-opt-result]') as HTMLDivElement | null;
+      if (target <= 0) {
+        if (resultBox) {
+          resultBox.hidden = false;
+          setText('[data-opt-result-text]', "Définissez un objectif final visé (EUR) avant de lancer l'optimisation.");
+        }
+        return;
+      }
+
+      const initial = Math.max(0, getNumber('initial'));
+      const monthly = Math.max(0, getNumber('monthly'));
+      const cagr = getNumber('cagr') / 100;
+      const maxDrawdown = Math.max(0, Math.min(0.95, getNumber('drawdown') / 100));
+      const { years, stopMonthlyAtMonth } = readAges();
+      const forceDrawdown = getCheckbox('forceDrawdown');
+      const months = years * 12;
+      const monthlyReturn = Math.pow(1 + cagr, 1 / 12) - 1;
+      const monthlyVolatility = computeMonthlyVol(maxDrawdown, years);
+      const baseParams: SimulationParams = {
+        initial, monthly, monthlyReturn, monthlyVolatility, months,
+        targetDrawdown: maxDrawdown, forceDrawdown, stopMonthlyAtMonth,
+      };
+
+      const PROBE_PATHS = 300;
+      const probe = (val: number) => {
+        const probeParams: SimulationParams = variable === 'initial'
+          ? { ...baseParams, initial: val }
+          : { ...baseParams, monthly: val };
+        return estimateMedianFinal(probeParams, PROBE_PATHS);
+      };
+
+      let low = 0;
+      let high = variable === 'initial' ? 10_000_000 : 50_000;
+      let highValue = probe(high);
+      let expandTries = 0;
+      while (highValue < target && expandTries < 4) {
+        high *= 2;
+        highValue = probe(high);
+        expandTries += 1;
+      }
+      if (highValue < target) {
+        if (resultBox) {
+          resultBox.hidden = false;
+          setText('[data-opt-result-text]', "L'objectif est trop élevé : même avec la valeur maximale testée, le scénario médian ne l'atteint pas. Augmentez la durée (retraite plus tard) ou réduisez l'objectif.");
+        }
+        return;
+      }
+
+      let best = high;
+      for (let iter = 0; iter < 22; iter += 1) {
+        const mid = (low + high) / 2;
+        const midVal = probe(mid);
+        if (midVal >= target) { high = mid; best = mid; }
+        else { low = mid; }
+        if ((high - low) < (variable === 'initial' ? 50 : 1)) break;
+      }
+
+      const finalVal = variable === 'initial'
+        ? Math.ceil(best / 100) * 100
+        : Math.ceil(best);
+      setInputValue(variable, finalVal);
+      saveParams();
+
+      if (resultBox) {
+        resultBox.hidden = false;
+        const label = variable === 'initial' ? "Investissement initial nécessaire" : "Versement mensuel nécessaire";
+        setText('[data-opt-result-text]', `${label} : ${formatter.format(finalVal)}`);
+      }
+
+      runSimulation();
+    };
+
+    root.querySelectorAll<HTMLButtonElement>('[data-optimize]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const variable = btn.dataset.optimize === 'monthly' ? 'monthly' : 'initial';
+        withRunning(() => optimize(variable), 'Optimisation en cours...');
+      });
+    });
+
+    const presetButtons = root.querySelectorAll<HTMLButtonElement>('[data-preset]');
+    const cagrInput = root.querySelector('[data-input="cagr"]') as HTMLInputElement | null;
+    const drawdownInput = root.querySelector('[data-input="drawdown"]') as HTMLInputElement | null;
+    const allInputs = root.querySelectorAll<HTMLInputElement>('input[data-input]');
+
+    // --- Cookie persistence ---------------------------------------------------
+    const COOKIE_NAME = 'ffunds_mc_params';
+    const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 an
+
+    const readCookies = (): Record<string, string> => {
+      return document.cookie.split(';').reduce<Record<string, string>>((acc, part) => {
+        const [rawKey, ...rest] = part.split('=');
+        const key = rawKey?.trim();
+        if (key) acc[key] = decodeURIComponent(rest.join('=').trim());
+        return acc;
+      }, {});
+    };
+
+    const loadSavedParams = () => {
+      try {
+        const raw = readCookies()[COOKIE_NAME];
+        if (!raw) return;
+        const data = JSON.parse(raw) as Record<string, string>;
+        allInputs.forEach((input) => {
+          const key = input.dataset.input;
+          if (!key || data[key] === undefined) return;
+          if (input.type === 'checkbox') {
+            input.checked = data[key] === 'true' || data[key] === '1';
+          } else if (data[key] !== '') {
+            input.value = data[key];
+          }
+        });
+      } catch {
+        // ignore corrupt cookie
+      }
+    };
+
+    const saveParams = () => {
+      const data: Record<string, string> = {};
+      allInputs.forEach((input) => {
+        const key = input.dataset.input;
+        if (!key) return;
+        if (input.type === 'checkbox') data[key] = input.checked ? 'true' : 'false';
+        else data[key] = input.value;
+      });
+      const value = encodeURIComponent(JSON.stringify(data));
+      document.cookie = `${COOKIE_NAME}=${value}; max-age=${COOKIE_MAX_AGE}; path=/; SameSite=Lax`;
+    };
+
+    // --- Presets --------------------------------------------------------------
+    const setActivePreset = (key: string) => {
+      presetButtons.forEach((btn) => {
+        const isActive = btn.dataset.preset === key;
+        btn.classList.toggle('is-active', isActive);
+        btn.setAttribute('aria-pressed', String(isActive));
+      });
+    };
+
+    const matchPreset = () => {
+      if (!cagrInput || !drawdownInput) return;
+      const cagr = Number(cagrInput.value);
+      const drawdown = Number(drawdownInput.value);
+      let matched: string | null = null;
+      presetButtons.forEach((btn) => {
+        if (btn.dataset.preset === 'custom') return;
+        if (Number(btn.dataset.cagr) === cagr && Number(btn.dataset.drawdown) === drawdown) {
+          matched = btn.dataset.preset ?? null;
+        }
+      });
+      setActivePreset(matched ?? 'custom');
+    };
+
+    presetButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (!cagrInput || !drawdownInput) return;
+        const cagr = btn.dataset.cagr;
+        const drawdown = btn.dataset.drawdown;
+        if (cagr !== undefined) cagrInput.value = cagr;
+        if (drawdown !== undefined) drawdownInput.value = drawdown;
+        setActivePreset(btn.dataset.preset ?? 'custom');
+        saveParams();
+        withRunning(runSimulation);
+      });
+    });
+
+    // Live update of the simulation-count slider display next to the label.
+    const pathsInput = root.querySelector('[data-input="paths"]') as HTMLInputElement | null;
+    const pathsDisplay = root.querySelector('[data-paths-display]') as HTMLElement | null;
+    const formatPathCount = (n: number) => new Intl.NumberFormat('fr-FR').format(n);
+    const updatePathsDisplay = () => {
+      if (pathsInput && pathsDisplay) pathsDisplay.textContent = formatPathCount(Number(pathsInput.value));
+    };
+    pathsInput?.addEventListener('input', updatePathsDisplay);
+    updatePathsDisplay();
+
+    [cagrInput, drawdownInput].forEach((input) => {
+      input?.addEventListener('input', matchPreset);
+    });
+
+    allInputs.forEach((input) => {
+      input.addEventListener('change', saveParams);
+    });
+
+    loadSavedParams();
+    matchPreset();
+    withRunning(runSimulation);
+  }
+</script>
+
+<style>
+  .mc-card {
+    display: grid;
+    gap: 1.25rem;
+    padding: 1.25rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 1rem;
+    background: var(--sl-color-gray-6);
+  }
+
+  .mc-presets {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .mc-presets-label {
+    color: var(--sl-color-gray-2);
+    font-weight: 700;
+  }
+
+  .mc-preset {
+    border: 1px solid var(--sl-color-gray-4);
+    border-radius: 999px;
+    padding: 0.5rem 0.9rem;
+    background: var(--sl-color-gray-7);
+    color: var(--sl-color-white);
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+  }
+
+  .mc-preset:hover {
+    border-color: var(--sl-color-accent-high);
+    transform: translateY(-1px);
+  }
+
+  .mc-preset.is-active {
+    background: var(--sl-color-accent-high);
+    color: var(--sl-color-black);
+    border-color: var(--sl-color-accent-high);
+  }
+
+  .mc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+  }
+
+  label {
+    display: grid;
+    gap: 0.4rem;
+    color: var(--sl-color-gray-2);
+    font-weight: 700;
+  }
+
+  input {
+    width: 100%;
+    padding: 0.72rem 0.8rem;
+    border: 1px solid var(--sl-color-gray-4);
+    border-radius: 0.75rem;
+    background: var(--sl-color-black);
+    color: var(--sl-color-white);
+    font: inherit;
+  }
+
+  input[type='range'] {
+    padding: 0;
+    height: 1.6rem;
+    background: transparent;
+    border: 0;
+    accent-color: var(--sl-color-accent-high);
+    cursor: pointer;
+  }
+
+  .mc-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+  }
+
+  .mc-hint {
+    color: var(--sl-color-gray-3);
+    font-size: 0.9rem;
+  }
+
+  button {
+    border: 0;
+    border-radius: 999px;
+    padding: 0.8rem 1.1rem;
+    background: var(--sl-color-accent-high);
+    color: var(--sl-color-black);
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+  }
+
+  button.is-running,
+  button[disabled] {
+    background: var(--sl-color-gray-4);
+    color: var(--sl-color-gray-2);
+    cursor: progress;
+    opacity: 0.85;
+  }
+
+  .mc-max {
+    color: var(--sl-color-gray-3);
+    font-style: normal;
+    font-weight: 500;
+    font-size: 0.78rem;
+    margin-left: 0.35rem;
+  }
+
+  .mc-real {
+    color: #fca5a5;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 0.78rem;
+    line-height: 1.2;
+  }
+
+  .mc-opt-btn {
+    background: transparent;
+    color: var(--sl-color-white);
+    border: 1px solid var(--sl-color-gray-4);
+  }
+
+  .mc-opt-btn:hover {
+    border-color: var(--sl-color-accent-high);
+    background: var(--sl-color-gray-7);
+  }
+
+  .mc-opt-result {
+    display: grid;
+    gap: 0.35rem;
+    padding: 1rem 1.1rem;
+    border-radius: 0.9rem;
+    border: 1px solid rgba(250, 204, 21, 0.45);
+    background: rgba(250, 204, 21, 0.08);
+    color: #fef9c3;
+  }
+
+  .mc-opt-result[hidden] {
+    display: none;
+  }
+
+  .mc-opt-result-hint {
+    color: rgba(254, 249, 195, 0.75);
+    font-size: 0.85rem;
+  }
+
+  .mc-zoom-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 0.75rem;
+    padding: 0.5rem 0.85rem;
+    border-radius: 0.6rem;
+    background: var(--sl-color-gray-7);
+    color: var(--sl-color-gray-2);
+    font-size: 0.85rem;
+  }
+
+  .mc-zoom-info[hidden] {
+    display: none;
+  }
+
+  .mc-zoom-reset {
+    background: transparent;
+    color: var(--sl-color-white);
+    border: 1px solid var(--sl-color-gray-4);
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+
+  .mc-zoom-reset:hover {
+    border-color: var(--sl-color-accent-high);
+    background: var(--sl-color-gray-6);
+  }
+
+  .mc-zoom-rect {
+    fill: rgba(45, 212, 191, 0.18);
+    stroke: rgba(45, 212, 191, 0.55);
+    stroke-width: 1;
+    pointer-events: none;
+  }
+
+  .mc-chart {
+    position: relative;
+    border-radius: 0.75rem;
+    border: 1px solid var(--sl-color-gray-5);
+    background: #08111f;
+    overflow: hidden;
+  }
+
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 900 / 420;
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  [data-single-svg] {
+    aspect-ratio: 900 / 360;
+  }
+
+  .mc-single {
+    display: grid;
+    gap: 1rem;
+    margin-top: 0.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px dashed var(--sl-color-gray-5);
+  }
+
+  .mc-single-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+  }
+
+  .mc-single-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--sl-color-white);
+  }
+
+  .mc-single-intro {
+    margin: 0;
+    color: var(--sl-color-gray-3);
+    font-size: 0.95rem;
+  }
+
+  .mc-single-run {
+    background: transparent;
+    color: var(--sl-color-white);
+    border: 1px solid var(--sl-color-gray-4);
+    padding: 0.55rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .mc-single-run:hover {
+    border-color: var(--sl-color-accent-high);
+    background: var(--sl-color-gray-7);
+  }
+
+  .mc-check {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 0.6rem;
+    font-weight: 600;
+    color: var(--sl-color-gray-2);
+  }
+
+  .mc-check input[type='checkbox'] {
+    width: auto;
+    margin: 0.2rem 0 0;
+    padding: 0;
+    accent-color: var(--sl-color-accent-high);
+    cursor: pointer;
+  }
+
+  .mc-check span {
+    line-height: 1.35;
+  }
+
+  .mc-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    color: var(--sl-color-gray-3);
+    font-size: 0.85rem;
+  }
+
+  .mc-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .mc-legend i {
+    width: 0.9rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    display: inline-block;
+  }
+
+  .mc-results {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+  }
+
+  article {
+    display: grid;
+    gap: 0.25rem;
+    padding: 1rem;
+    border-radius: 0.9rem;
+    background: var(--sl-color-gray-7);
+  }
+
+  article span,
+  .mc-note {
+    color: var(--sl-color-gray-3);
+  }
+
+  article strong {
+    color: var(--sl-color-white);
+    font-size: 1.35rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mc-note {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+</style>
