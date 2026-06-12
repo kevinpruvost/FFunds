@@ -4,6 +4,10 @@ import starlight from '@astrojs/starlight';
 import starlightThemeSix from '@six-tech/starlight-theme-six'
 
 export default defineConfig({
+
+  site: 'https://kevinpruvost.github.io',
+	base: '/FFunds',
+
   integrations: [
     starlight({
       plugins: [
