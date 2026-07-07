@@ -1,0 +1,79 @@
+/* FFunds — Monte Carlo Simulator design tokens.
+   Source of truth: DESIGN.md (project root).
+   Loaded globally by Starlight via customCss. The :root:root selector
+   raises specificity above Starlight's @layer starlight :root rules so
+   our tokens win. All values trace back to DESIGN.md Section 2 (Color)
+   and Section 4 (Spacing); extension tokens are derived from those via
+   color-mix so no raw hex escapes the contract. */
+
+:root:root {
+  /* ── Section 2 · Color (dark mode values) ─────────────────────── */
+  --mc-bg: #080d17;              /* surface / base — chart + page bg */
+  --mc-card-bg: #0f1727;         /* surface / card */
+  --mc-input-bg: #060b12;        /* surface / recessed */
+  --mc-elevated-bg: #162032;     /* surface / elevated */
+  --mc-text-primary: #f1f5f9;    /* text / primary */
+  --mc-text-secondary: #94a3b8;  /* text / secondary */
+  --mc-text-muted: #64748b;      /* text / muted */
+  --mc-border: #1e293b;          /* border / default */
+  --mc-border-subtle: #162032;   /* border / subtle */
+  --mc-ring: #10b981;            /* border / focus ring */
+  --mc-accent: #10b981;          /* accent / primary */
+  --mc-accent-hover: #34d399;    /* accent / hover */
+  --mc-green: #34d399;           /* status / growth */
+  --mc-red: #f87171;             /* status / loss */
+  --mc-chart-p10: #60a5fa;       /* chart / p10 band */
+  --mc-chart-p90: #818cf8;       /* chart / p90 band */
+  --mc-chart-median: #34d399;    /* chart / p50 median line */
+  --mc-chart-trajectory: #facc15;/* chart / single trace + target */
+  --mc-chart-single-fill: rgba(250, 204, 21, 0.15);
+  --mc-chart-grid: #1e293b;      /* chart / grid lines */
+  --mc-chart-axis: #475569;      /* chart / axis lines */
+  --mc-chart-label: #94a3b8;     /* chart / axis labels */
+  --mc-tooltip-bg: #1e293b;      /* chart / tooltip bg */
+  --mc-preset-bg: rgba(16, 185, 129, 0.12);
+  --mc-preset-border: rgba(16, 185, 129, 0.3);
+
+  /* ── Extension tokens (derived from DESIGN.md palette via color-mix) ── */
+  /* Percentile band fill between p10 and p90. */
+  --mc-chart-band: color-mix(in srgb, var(--mc-chart-p90) 15%, transparent);
+  /* Solid band swatch for legend use. */
+  --mc-chart-band-strong: color-mix(in srgb, var(--mc-chart-p10) 50%, var(--mc-chart-p90) 50%);
+  /* Crosshair cursor line. */
+  --mc-chart-cursor: color-mix(in srgb, var(--mc-text-primary) 45%, transparent);
+  /* Tooltip border. */
+  --mc-chart-tooltip-stroke: color-mix(in srgb, var(--mc-text-secondary) 35%, transparent);
+  /* Single-chart "total versé" dashed reference line. */
+  --mc-chart-single-invested: color-mix(in srgb, var(--mc-text-secondary) 55%, transparent);
+  /* Drag-to-zoom selection rectangle. */
+  --mc-zoom-fill: color-mix(in srgb, var(--mc-accent) 18%, transparent);
+  --mc-zoom-stroke: color-mix(in srgb, var(--mc-accent) 55%, transparent);
+  /* Running-state overlay over the chart area. */
+  --mc-overlay: color-mix(in srgb, var(--mc-bg) 72%, transparent);
+  /* Optimiser result banner — derived from the trajectory/target yellow. */
+  --mc-opt-bg: color-mix(in srgb, var(--mc-chart-trajectory) 9%, transparent);
+  --mc-opt-border: color-mix(in srgb, var(--mc-chart-trajectory) 45%, transparent);
+  --mc-opt-text: color-mix(in srgb, var(--mc-chart-trajectory) 22%, white);
+  --mc-opt-hint: color-mix(in srgb, var(--mc-opt-text) 75%, transparent);
+
+  /* ── Section 4 · Spacing (4px base) ───────────────────────────── */
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* ── Section 3 · Typography (reference values) ────────────────── */
+  --mc-fz-section: 20px;
+  --mc-fz-value: 28px;
+  --mc-fz-label: 11px;
+  --mc-fz-body: 14px;
+  --mc-fz-input: 16px;
+  --mc-fz-axis: 10px;
+  --mc-fz-tooltip: 12px;
+  --mc-fz-mono: 13px;
+  --mc-radius: 12px;
+  --mc-radius-sm: 8px;
+  --mc-transition: 200ms ease-out;
+}

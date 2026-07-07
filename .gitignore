@@ -4,3 +4,10 @@ dist/
 .env
 .env.*
 .DS_Store
+
+agent_space/
+scripts/
+test*
+.omo/
+.opencode/
+DESIGN.md

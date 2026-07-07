@@ -5,8 +5,10 @@
   <div class="mc-presets" role="group" aria-label="Profils prédéfinis">
     <span class="mc-presets-label">Profil :</span>
     <button type="button" class="mc-preset" data-preset="custom" data-cagr="7" data-drawdown="30">Personnalisé</button>
-    <button type="button" class="mc-preset" data-preset="golden" data-cagr="9" data-drawdown="29">Golden Ratio Portfolio</button>
-    <button type="button" class="mc-preset" data-preset="golden-2x" data-cagr="12.5" data-drawdown="40">2x Golden Ratio Portfolio</button>
+    <button type="button" class="mc-preset" data-preset="golden" data-cagr="8" data-drawdown="29">Golden Ratio Portfolio</button>
+    <button type="button" class="mc-preset" data-preset="golden-2x" data-cagr="11.5" data-drawdown="40">2x Golden Ratio Portfolio</button>
+    <button type="button" class="mc-preset" data-preset="sp500" data-cagr="10.76" data-drawdown="63">S&P 500</button>
+    <button type="button" class="mc-preset" data-preset="world" data-cagr="8.05" data-drawdown="55">MSCI World</button>
   </div>
 
   <div class="mc-grid">
@@ -36,7 +38,7 @@
     </label>
     <label>
       <span>Inflation annuelle (%)</span>
-      <input data-input="inflation" type="number" step="0.1" value="2" />
+      <input data-input="inflation" type="number" step="0.1" value="2.5" />
     </label>
     <label>
       <span>Drawdown max estimé (%) <em class="mc-max">max 95</em></span>
@@ -82,36 +84,36 @@
       aria-label="Graphique interactif Monte Carlo"
     >
       <g data-grid></g>
-      <path data-band fill="rgba(45, 212, 191, 0.18)" stroke="none"></path>
-      <line data-target-line x1="0" y1="0" x2="0" y2="0" stroke="#facc15" stroke-width="1.5" stroke-dasharray="6 4" style="display:none"></line>
-      <text data-target-label x="0" y="0" fill="#facc15" font-size="12" text-anchor="end" style="display:none"></text>
-      <path data-p10 fill="none" stroke="rgba(96, 165, 250, 0.8)" stroke-width="1.5" stroke-dasharray="4 4"></path>
-      <path data-p90 fill="none" stroke="rgba(96, 165, 250, 0.8)" stroke-width="1.5" stroke-dasharray="4 4"></path>
-      <path data-p50 fill="none" stroke="#2dd4bf" stroke-width="2.5"></path>
-      <path data-p50-real fill="none" stroke="#f87171" stroke-width="2" stroke-dasharray="5 4"></path>
+      <path data-band stroke="none" style="fill: var(--mc-chart-band)"></path>
+      <line data-target-line x1="0" y1="0" x2="0" y2="0" stroke-width="1.5" stroke-dasharray="6 4" style="display:none; stroke: var(--mc-chart-trajectory)"></line>
+      <text data-target-label x="0" y="0" font-size="12" text-anchor="end" style="display:none; fill: var(--mc-chart-trajectory)"></text>
+      <path data-p10 fill="none" stroke-width="1.5" stroke-dasharray="4 4" style="stroke: var(--mc-chart-p10)"></path>
+      <path data-p90 fill="none" stroke-width="1.5" stroke-dasharray="4 4" style="stroke: var(--mc-chart-p90)"></path>
+      <path data-p50 fill="none" stroke-width="2.5" style="stroke: var(--mc-chart-median)"></path>
+      <path data-p50-real fill="none" stroke-width="2" stroke-dasharray="5 4" style="stroke: var(--mc-red)"></path>
       <g data-y-labels></g>
       <g data-x-labels></g>
-      <line data-cursor x1="0" y1="0" x2="0" y2="0" stroke="rgba(226, 232, 240, 0.45)" stroke-width="1" stroke-dasharray="3 3" style="display:none"></line>
-      <circle data-dot-p50 r="4" fill="#2dd4bf" style="display:none"></circle>
-      <circle data-dot-p10 r="3" fill="#60a5fa" style="display:none"></circle>
-      <circle data-dot-p90 r="3" fill="#60a5fa" style="display:none"></circle>
+      <line data-cursor x1="0" y1="0" x2="0" y2="0" stroke-width="1" stroke-dasharray="3 3" style="display:none; stroke: var(--mc-chart-cursor)"></line>
+      <circle data-dot-p50 r="4" style="display:none; fill: var(--mc-chart-median)"></circle>
+      <circle data-dot-p10 r="3" style="display:none; fill: var(--mc-chart-p10)"></circle>
+      <circle data-dot-p90 r="3" style="display:none; fill: var(--mc-chart-p90)"></circle>
       <rect data-zoom-rect class="mc-zoom-rect" x="0" y="0" width="0" height="0" style="display:none"></rect>
-      <g data-hover-labels style="display:none">
-        <rect data-hover-bg x="0" y="0" width="0" height="0" rx="6" ry="6" fill="rgba(15, 23, 42, 0.95)" stroke="rgba(148, 163, 184, 0.35)" stroke-width="1"></rect>
-        <text data-hover-year x="0" y="0" fill="#f8fafc" font-size="13" font-weight="700"></text>
-        <text data-hover-p90 x="0" y="0" fill="#60a5fa" font-size="13"></text>
-        <text data-hover-p50 x="0" y="0" fill="#2dd4bf" font-size="13" font-weight="700"></text>
-        <text data-hover-p10 x="0" y="0" fill="#60a5fa" font-size="13"></text>
+      <g data-hover-labels style="display:none; pointer-events: none">
+        <rect data-hover-bg x="0" y="0" width="0" height="0" rx="6" ry="6" stroke-width="1" style="fill: var(--mc-tooltip-bg); stroke: var(--mc-chart-tooltip-stroke)"></rect>
+        <text data-hover-year x="0" y="0" font-size="13" font-weight="700" style="fill: var(--mc-text-primary)"></text>
+        <text data-hover-p90 x="0" y="0" font-size="13" style="fill: var(--mc-chart-p90)"></text>
+        <text data-hover-p50 x="0" y="0" font-size="13" font-weight="700" style="fill: var(--mc-chart-median)"></text>
+        <text data-hover-p10 x="0" y="0" font-size="13" style="fill: var(--mc-chart-p10)"></text>
       </g>
     </svg>
   </div>
 
   <div class="mc-legend">
-    <span><i style="background:#2dd4bf"></i>Scénario médian (nominal)</span>
-    <span><i style="background:#f87171"></i>Scénario médian (après inflation)</span>
-    <span><i style="background:rgba(45, 212, 191, 0.45)"></i>Plage pessimiste - optimiste</span>
-    <span><i style="background:#60a5fa"></i>Limites pessimiste / optimiste</span>
-    <span><i style="background:#facc15"></i>Objectif final</span>
+    <span><i style="background: var(--mc-chart-median)"></i>Scénario médian (nominal)</span>
+    <span><i style="background: var(--mc-red)"></i>Scénario médian (après inflation)</span>
+    <span><i style="background: var(--mc-chart-band-strong)"></i>Plage pessimiste - optimiste</span>
+    <span><i style="background: var(--mc-chart-p10)"></i>Limites pessimiste / optimiste</span>
+    <span><i style="background: var(--mc-chart-trajectory)"></i>Objectif final</span>
   </div>
 
   <div class="mc-results" aria-live="polite">
@@ -166,29 +168,29 @@
         aria-label="Trajectoire aléatoire unique"
       >
         <g data-single-grid></g>
-        <path data-single-invested fill="none" stroke="rgba(148, 163, 184, 0.55)" stroke-width="1.5" stroke-dasharray="4 4"></path>
-        <path data-single-path fill="none" stroke="#f59e0b" stroke-width="2"></path>
-        <path data-single-real fill="none" stroke="#f87171" stroke-width="1.5" stroke-dasharray="5 4"></path>
+        <path data-single-invested fill="none" stroke-width="1.5" stroke-dasharray="4 4" style="stroke: var(--mc-chart-single-invested)"></path>
+        <path data-single-path fill="none" stroke-width="2" style="stroke: var(--mc-chart-trajectory)"></path>
+        <path data-single-real fill="none" stroke-width="1.5" stroke-dasharray="5 4" style="stroke: var(--mc-red)"></path>
         <g data-single-y-labels></g>
         <g data-single-x-labels></g>
-        <line data-single-cursor x1="0" y1="0" x2="0" y2="0" stroke="rgba(226, 232, 240, 0.45)" stroke-width="1" stroke-dasharray="3 3" style="display:none"></line>
-        <circle data-single-dot r="4" fill="#f59e0b" style="display:none"></circle>
+        <line data-single-cursor x1="0" y1="0" x2="0" y2="0" stroke-width="1" stroke-dasharray="3 3" style="display:none; stroke: var(--mc-chart-cursor)"></line>
+        <circle data-single-dot r="4" style="display:none; fill: var(--mc-chart-trajectory)"></circle>
         <rect data-single-zoom-rect class="mc-zoom-rect" x="0" y="0" width="0" height="0" style="display:none"></rect>
-        <g data-single-hover-labels style="display:none">
-          <rect data-single-hover-bg x="0" y="0" width="0" height="0" rx="6" ry="6" fill="rgba(15, 23, 42, 0.95)" stroke="rgba(148, 163, 184, 0.35)" stroke-width="1"></rect>
-          <text data-single-hover-year x="0" y="0" fill="#f8fafc" font-size="13" font-weight="700"></text>
-          <text data-single-hover-value x="0" y="0" fill="#f59e0b" font-size="13" font-weight="700"></text>
-          <text data-single-hover-invested x="0" y="0" fill="#cbd5e1" font-size="13"></text>
+        <g data-single-hover-labels style="display:none; pointer-events: none">
+          <rect data-single-hover-bg x="0" y="0" width="0" height="0" rx="6" ry="6" stroke-width="1" style="fill: var(--mc-tooltip-bg); stroke: var(--mc-chart-tooltip-stroke)"></rect>
+          <text data-single-hover-year x="0" y="0" font-size="13" font-weight="700" style="fill: var(--mc-text-primary)"></text>
+          <text data-single-hover-value x="0" y="0" font-size="13" font-weight="700" style="fill: var(--mc-chart-trajectory)"></text>
+          <text data-single-hover-invested x="0" y="0" font-size="13" style="fill: var(--mc-text-secondary)"></text>
           <text data-single-hover-yoy x="0" y="0" font-size="13" font-weight="600"></text>
           <text data-single-hover-total x="0" y="0" font-size="13" font-weight="600"></text>
-          <text data-single-hover-mdd x="0" y="0" fill="#f87171" font-size="13"></text>
+          <text data-single-hover-mdd x="0" y="0" font-size="13" style="fill: var(--mc-red)"></text>
         </g>
       </svg>
     </div>
     <div class="mc-legend">
-      <span><i style="background:#f59e0b"></i>Trajectoire aléatoire (nominal)</span>
-      <span><i style="background:#f87171"></i>Trajectoire (après inflation)</span>
-      <span><i style="background:rgba(148, 163, 184, 0.55)"></i>Total versé</span>
+      <span><i style="background: var(--mc-chart-trajectory)"></i>Trajectoire aléatoire (nominal)</span>
+      <span><i style="background: var(--mc-red)"></i>Trajectoire (après inflation)</span>
+      <span><i style="background: var(--mc-chart-single-invested)"></i>Total versé</span>
     </div>
     <div class="mc-results" aria-live="polite">
       <article>
@@ -427,7 +429,6 @@
         line.setAttribute('x2', String(VIEW_W - PAD_RIGHT));
         line.setAttribute('y1', y.toFixed(2));
         line.setAttribute('y2', y.toFixed(2));
-        line.setAttribute('stroke', 'rgba(148, 163, 184, 0.18)');
         line.setAttribute('stroke-width', '1');
         grid.appendChild(line);
 
@@ -435,7 +436,6 @@
         label.setAttribute('x', String(PAD_LEFT - 8));
         label.setAttribute('y', (y + 4).toFixed(2));
         label.setAttribute('text-anchor', 'end');
-        label.setAttribute('fill', '#94a3b8');
         label.setAttribute('font-size', '12');
         label.textContent = compactFormatter.format(value);
         yLabels.appendChild(label);
@@ -453,7 +453,6 @@
         label.setAttribute('x', x.toFixed(2));
         label.setAttribute('y', String(VIEW_H - PAD_BOTTOM + 18));
         label.setAttribute('text-anchor', 'middle');
-        label.setAttribute('fill', '#94a3b8');
         label.setAttribute('font-size', '12');
         label.textContent = formatAgeLabel(absoluteMonth, currentAge, isMonthly);
         xLabels.appendChild(label);
@@ -788,7 +787,6 @@
         line.setAttribute('x2', String(SINGLE_VIEW_W - SINGLE_PAD_RIGHT));
         line.setAttribute('y1', y.toFixed(2));
         line.setAttribute('y2', y.toFixed(2));
-        line.setAttribute('stroke', 'rgba(148, 163, 184, 0.18)');
         line.setAttribute('stroke-width', '1');
         grid.appendChild(line);
 
@@ -796,7 +794,6 @@
         label.setAttribute('x', String(SINGLE_PAD_LEFT - 8));
         label.setAttribute('y', (y + 4).toFixed(2));
         label.setAttribute('text-anchor', 'end');
-        label.setAttribute('fill', '#94a3b8');
         label.setAttribute('font-size', '12');
         label.textContent = compactFormatter.format(value);
         yLabels.appendChild(label);
@@ -812,7 +809,6 @@
         label.setAttribute('x', x.toFixed(2));
         label.setAttribute('y', String(SINGLE_VIEW_H - SINGLE_PAD_BOTTOM + 18));
         label.setAttribute('text-anchor', 'middle');
-        label.setAttribute('fill', '#94a3b8');
         label.setAttribute('font-size', '12');
         label.textContent = formatAgeLabel(absoluteMonth, currentAge, isMonthly);
         xLabels.appendChild(label);
@@ -998,7 +994,7 @@
         const totalGrowth = investedVal > 0 ? (pathVal - investedVal) / investedVal : 0;
 
         const fmtPct = (v: number) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)} %`;
-        const colorFor = (v: number) => (v >= 0 ? '#4ade80' : '#f87171');
+        const colorFor = (v: number) => (v >= 0 ? 'var(--mc-green)' : 'var(--mc-red)');
 
         yearText.textContent = yearLabel;
         valueText.textContent = `Valeur : ${formatter.format(pathVal)}`;
@@ -1006,7 +1002,7 @@
         yoyText.textContent = absoluteMonth === 0
           ? `${periodLabel} : —`
           : `${periodLabel} : ${fmtPct(yoyGrowth)}`;
-        yoyText.setAttribute('fill', absoluteMonth === 0 ? '#cbd5e1' : colorFor(yoyGrowth));
+        yoyText.setAttribute('fill', absoluteMonth === 0 ? 'var(--mc-text-secondary)' : colorFor(yoyGrowth));
         totalText.textContent = `Croissance totale : ${fmtPct(totalGrowth)}`;
         totalText.setAttribute('fill', colorFor(totalGrowth));
         mddText.textContent = `Drawdown max : ${(drawdownVal * 100).toFixed(1)} %`;
@@ -1542,150 +1538,273 @@
 </script>
 
 <style>
+  /* ── Container ─────────────────────────────────────────────── */
   .mc-card {
     display: grid;
-    gap: 1.25rem;
-    padding: 1.25rem;
-    border: 1px solid var(--sl-color-gray-5);
-    border-radius: 1rem;
-    background: var(--sl-color-gray-6);
+    gap: var(--space-6);
+    padding: var(--space-6);
+    border: 1px solid var(--mc-border);
+    border-radius: var(--mc-radius);
+    background: var(--mc-card-bg);
   }
 
+  /* ── Preset pills ──────────────────────────────────────────── */
   .mc-presets {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem 0.75rem;
+    gap: var(--space-2) var(--space-3);
   }
 
   .mc-presets-label {
-    color: var(--sl-color-gray-2);
-    font-weight: 700;
+    color: var(--mc-text-secondary);
+    font-weight: 600;
+    font-size: var(--mc-fz-body);
+    letter-spacing: 0.02em;
   }
 
   .mc-preset {
-    border: 1px solid var(--sl-color-gray-4);
+    border: 1px solid var(--mc-border);
     border-radius: 999px;
-    padding: 0.5rem 0.9rem;
-    background: var(--sl-color-gray-7);
-    color: var(--sl-color-white);
+    padding: var(--space-2) var(--space-4);
+    background: transparent;
+    color: var(--mc-text-primary);
     font: inherit;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: var(--mc-fz-body);
     cursor: pointer;
-    transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+    transition: all var(--mc-transition);
   }
 
   .mc-preset:hover {
-    border-color: var(--sl-color-accent-high);
+    border-color: var(--mc-accent);
+    color: var(--mc-accent-hover);
     transform: translateY(-1px);
   }
 
   .mc-preset.is-active {
-    background: var(--sl-color-accent-high);
-    color: var(--sl-color-black);
-    border-color: var(--sl-color-accent-high);
+    background: var(--mc-preset-bg);
+    color: var(--mc-accent-hover);
+    border-color: var(--mc-preset-border);
   }
 
+  /* ── Form grid ─────────────────────────────────────────────── */
   .mc-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1rem;
+    gap: var(--space-3);
   }
 
   label {
     display: grid;
-    gap: 0.4rem;
-    color: var(--sl-color-gray-2);
-    font-weight: 700;
+    gap: var(--space-2);
+    color: var(--mc-text-secondary);
+    font-weight: 500;
+    font-size: var(--mc-fz-body);
   }
 
   input {
     width: 100%;
-    padding: 0.72rem 0.8rem;
-    border: 1px solid var(--sl-color-gray-4);
-    border-radius: 0.75rem;
-    background: var(--sl-color-black);
-    color: var(--sl-color-white);
+    min-height: 40px;
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--mc-border);
+    border-radius: var(--mc-radius-sm);
+    background: var(--mc-input-bg);
+    color: var(--mc-text-primary);
     font: inherit;
+    font-size: var(--mc-fz-input);
+    font-variant-numeric: tabular-nums;
+    transition: border-color var(--mc-transition), outline-color var(--mc-transition);
   }
 
+  input::placeholder {
+    color: var(--mc-text-muted);
+  }
+
+  input:focus {
+    outline: 2px solid var(--mc-ring);
+    outline-offset: -2px;
+    border-color: var(--mc-ring);
+  }
+
+  /* ── Range slider ──────────────────────────────────────────── */
   input[type='range'] {
+    min-height: auto;
+    height: 6px;
     padding: 0;
-    height: 1.6rem;
-    background: transparent;
-    border: 0;
-    accent-color: var(--sl-color-accent-high);
+    border: 1px solid var(--mc-border);
+    border-radius: 999px;
+    background: var(--mc-border);
     cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
   }
 
+  input[type='range']:focus {
+    outline: 2px solid var(--mc-ring);
+    outline-offset: 2px;
+  }
+
+  input[type='range']::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--mc-accent);
+    border: 2px solid var(--mc-card-bg);
+    cursor: pointer;
+    transition: background var(--mc-transition);
+  }
+
+  input[type='range']::-webkit-slider-thumb:hover {
+    background: var(--mc-accent-hover);
+  }
+
+  input[type='range']::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--mc-accent);
+    border: 2px solid var(--mc-card-bg);
+    cursor: pointer;
+    transition: background var(--mc-transition);
+  }
+
+  input[type='range']::-moz-range-thumb:hover {
+    background: var(--mc-accent-hover);
+  }
+
+  input[type='range']::-moz-range-progress {
+    background: var(--mc-accent);
+    height: 6px;
+    border-radius: 999px;
+  }
+
+  input[type='range']::-moz-range-track {
+    background: var(--mc-border);
+    height: 6px;
+    border-radius: 999px;
+  }
+
+  /* ── Action bar ────────────────────────────────────────────── */
   .mc-actions {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.75rem 1rem;
+    gap: var(--space-3) var(--space-4);
   }
 
   .mc-hint {
-    color: var(--sl-color-gray-3);
-    font-size: 0.9rem;
+    color: var(--mc-text-muted);
+    font-size: var(--mc-fz-body);
   }
 
+  /* ── Buttons ───────────────────────────────────────────────── */
   button {
-    border: 0;
+    border: 1px solid var(--mc-accent);
     border-radius: 999px;
-    padding: 0.8rem 1.1rem;
-    background: var(--sl-color-accent-high);
-    color: var(--sl-color-black);
+    padding: var(--space-2) var(--space-6);
+    min-height: 40px;
+    background: var(--mc-accent);
+    color: var(--mc-text-primary);
     font: inherit;
-    font-weight: 800;
+    font-weight: 700;
     cursor: pointer;
-    transition: background 160ms ease, color 160ms ease, opacity 160ms ease;
+    transition: all var(--mc-transition);
   }
 
-  button.is-running,
-  button[disabled] {
-    background: var(--sl-color-gray-4);
-    color: var(--sl-color-gray-2);
+  button:hover {
+    background: var(--mc-accent-hover);
+    border-color: var(--mc-accent-hover);
+  }
+
+  button:active {
+    background: color-mix(in srgb, var(--mc-accent) 82%, black);
+  }
+
+  button:focus-visible {
+    outline: 2px solid var(--mc-ring);
+    outline-offset: 2px;
+  }
+
+  button.is-running {
+    animation: mc-pulse 800ms ease-in-out infinite;
     cursor: progress;
-    opacity: 0.85;
   }
 
+  button[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--mc-border);
+    border-color: var(--mc-border);
+    color: var(--mc-text-muted);
+  }
+
+  button[disabled]:hover {
+    background: var(--mc-border);
+    border-color: var(--mc-border);
+  }
+
+  /* Secondary / outline buttons */
+  .mc-opt-btn,
+  .mc-zoom-reset,
+  .mc-single-run {
+    background: transparent;
+    color: var(--mc-text-primary);
+    border: 1px solid var(--mc-border);
+  }
+
+  .mc-opt-btn:hover,
+  .mc-zoom-reset:hover,
+  .mc-single-run:hover {
+    border-color: var(--mc-accent);
+    background: var(--mc-elevated-bg);
+    color: var(--mc-accent-hover);
+  }
+
+  .mc-zoom-reset {
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--mc-fz-body);
+    font-weight: 600;
+    min-height: auto;
+  }
+
+  .mc-single-run {
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--mc-fz-body);
+    font-weight: 600;
+    min-height: auto;
+  }
+
+  /* ── Inline hints ──────────────────────────────────────────── */
   .mc-max {
-    color: var(--sl-color-gray-3);
+    color: var(--mc-text-muted);
     font-style: normal;
     font-weight: 500;
-    font-size: 0.78rem;
-    margin-left: 0.35rem;
+    font-size: var(--mc-fz-label);
+    margin-left: var(--space-2);
+    font-variant-numeric: tabular-nums;
   }
 
   .mc-real {
-    color: #fca5a5;
+    color: var(--mc-red);
     font-style: normal;
     font-weight: 600;
-    font-size: 0.78rem;
+    font-size: var(--mc-fz-body);
     line-height: 1.2;
+    font-variant-numeric: tabular-nums;
   }
 
-  .mc-opt-btn {
-    background: transparent;
-    color: var(--sl-color-white);
-    border: 1px solid var(--sl-color-gray-4);
-  }
-
-  .mc-opt-btn:hover {
-    border-color: var(--sl-color-accent-high);
-    background: var(--sl-color-gray-7);
-  }
-
+  /* ── Optimiser result banner ───────────────────────────────── */
   .mc-opt-result {
     display: grid;
-    gap: 0.35rem;
-    padding: 1rem 1.1rem;
-    border-radius: 0.9rem;
-    border: 1px solid rgba(250, 204, 21, 0.45);
-    background: rgba(250, 204, 21, 0.08);
-    color: #fef9c3;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-6);
+    border-radius: var(--mc-radius-sm);
+    border: 1px solid var(--mc-opt-border);
+    background: var(--mc-opt-bg);
+    color: var(--mc-opt-text);
   }
 
   .mc-opt-result[hidden] {
@@ -1693,55 +1812,43 @@
   }
 
   .mc-opt-result-hint {
-    color: rgba(254, 249, 195, 0.75);
-    font-size: 0.85rem;
+    color: var(--mc-opt-hint);
+    font-size: var(--mc-fz-body);
   }
 
+  /* ── Zoom info bar ─────────────────────────────────────────── */
   .mc-zoom-info {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem 0.75rem;
-    padding: 0.5rem 0.85rem;
-    border-radius: 0.6rem;
-    background: var(--sl-color-gray-7);
-    color: var(--sl-color-gray-2);
-    font-size: 0.85rem;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--mc-radius-sm);
+    border: 1px solid var(--mc-border);
+    background: var(--mc-elevated-bg);
+    color: var(--mc-text-secondary);
+    font-size: var(--mc-fz-body);
   }
 
   .mc-zoom-info[hidden] {
     display: none;
   }
 
-  .mc-zoom-reset {
-    background: transparent;
-    color: var(--sl-color-white);
-    border: 1px solid var(--sl-color-gray-4);
-    padding: 0.4rem 0.8rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    border-radius: 999px;
-    cursor: pointer;
-  }
-
-  .mc-zoom-reset:hover {
-    border-color: var(--sl-color-accent-high);
-    background: var(--sl-color-gray-6);
-  }
-
+  /* ── Zoom selection rectangle ──────────────────────────────── */
   .mc-zoom-rect {
-    fill: rgba(45, 212, 191, 0.18);
-    stroke: rgba(45, 212, 191, 0.55);
+    fill: var(--mc-zoom-fill);
+    stroke: var(--mc-zoom-stroke);
     stroke-width: 1;
     pointer-events: none;
   }
 
+  /* ── Chart area ────────────────────────────────────────────── */
   .mc-chart {
     position: relative;
-    border-radius: 0.75rem;
-    border: 1px solid var(--sl-color-gray-5);
-    background: #08111f;
+    border-radius: var(--mc-radius-sm);
+    border: 1px solid var(--mc-border);
+    background: linear-gradient(180deg, var(--mc-bg) 0%, var(--mc-border-subtle) 100%);
     overflow: hidden;
   }
 
@@ -1758,12 +1865,54 @@
     aspect-ratio: 900 / 360;
   }
 
+  /* Grid lines + axis labels are created by JS at runtime, so they
+     escape Astro's scoped attribute. Use :global() to reach them and
+     override the presentation attributes JS sets. */
+  :global([data-grid] line),
+  :global([data-single-grid] line) {
+    stroke: var(--mc-chart-grid);
+    stroke-width: 1;
+  }
+
+  :global([data-y-labels] text),
+  :global([data-x-labels] text),
+  :global([data-single-y-labels] text),
+  :global([data-single-x-labels] text) {
+    fill: var(--mc-chart-label);
+    font-size: var(--mc-fz-axis);
+  }
+
+  /* ── Running-state overlay (CSS-only, driven by button.is-running) ── */
+  :global(.mc-card:has([data-run].is-running) [data-chart]::after),
+  :global(.mc-card:has([data-single-run].is-running) [data-single-chart]::after) {
+    content: 'Calcul en cours…';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--mc-overlay);
+    color: var(--mc-text-secondary);
+    font-size: var(--mc-fz-body);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    animation: mc-pulse 800ms ease-in-out infinite;
+    pointer-events: none;
+    border-radius: var(--mc-radius-sm);
+  }
+
+  @keyframes mc-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* ── Single trajectory section ─────────────────────────────── */
   .mc-single {
     display: grid;
-    gap: 1rem;
-    margin-top: 0.5rem;
-    padding-top: 1.25rem;
-    border-top: 1px dashed var(--sl-color-gray-5);
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+    padding-top: var(--space-6);
+    border-top: 1px dashed var(--mc-border);
   }
 
   .mc-single-header {
@@ -1771,48 +1920,37 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem 1rem;
+    gap: var(--space-3) var(--space-4);
   }
 
   .mc-single-header h3 {
     margin: 0;
-    font-size: 1.1rem;
-    color: var(--sl-color-white);
+    font-size: var(--mc-fz-section);
+    font-weight: 600;
+    color: var(--mc-text-primary);
   }
 
   .mc-single-intro {
     margin: 0;
-    color: var(--sl-color-gray-3);
-    font-size: 0.95rem;
+    color: var(--mc-text-secondary);
+    font-size: var(--mc-fz-body);
   }
 
-  .mc-single-run {
-    background: transparent;
-    color: var(--sl-color-white);
-    border: 1px solid var(--sl-color-gray-4);
-    padding: 0.55rem 1rem;
-    font-size: 0.9rem;
-    font-weight: 600;
-  }
-
-  .mc-single-run:hover {
-    border-color: var(--sl-color-accent-high);
-    background: var(--sl-color-gray-7);
-  }
-
+  /* ── Checkbox row ──────────────────────────────────────────── */
   .mc-check {
     flex-direction: row;
     align-items: flex-start;
-    gap: 0.6rem;
-    font-weight: 600;
-    color: var(--sl-color-gray-2);
+    gap: var(--space-2);
+    font-weight: 500;
+    color: var(--mc-text-secondary);
   }
 
   .mc-check input[type='checkbox'] {
     width: auto;
+    min-height: auto;
     margin: 0.2rem 0 0;
     padding: 0;
-    accent-color: var(--sl-color-accent-high);
+    accent-color: var(--mc-accent);
     cursor: pointer;
   }
 
@@ -1820,18 +1958,19 @@
     line-height: 1.35;
   }
 
+  /* ── Legend ────────────────────────────────────────────────── */
   .mc-legend {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem 1.25rem;
-    color: var(--sl-color-gray-3);
-    font-size: 0.85rem;
+    gap: var(--space-2) var(--space-6);
+    color: var(--mc-text-secondary);
+    font-size: var(--mc-fz-body);
   }
 
   .mc-legend span {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
+    gap: var(--space-2);
   }
 
   .mc-legend i {
@@ -1841,33 +1980,75 @@
     display: inline-block;
   }
 
+  /* ── Result cards ──────────────────────────────────────────── */
   .mc-results {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   article {
+    position: relative;
     display: grid;
-    gap: 0.25rem;
-    padding: 1rem;
-    border-radius: 0.9rem;
-    background: var(--sl-color-gray-7);
+    gap: var(--space-2);
+    padding: var(--space-6);
+    border: 1px solid var(--mc-border);
+    border-radius: var(--mc-radius);
+    background: var(--mc-card-bg);
+    transition: all var(--mc-transition);
   }
 
-  article span,
-  .mc-note {
-    color: var(--sl-color-gray-3);
+  article::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: transparent;
+    border-radius: var(--mc-radius) 0 0 var(--mc-radius);
+    transition: background var(--mc-transition);
+  }
+
+  article:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--mc-accent) 45%, var(--mc-border));
+  }
+
+  article:hover::before {
+    background: var(--mc-accent);
+  }
+
+  article span {
+    color: var(--mc-text-secondary);
+    font-size: var(--mc-fz-label);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
 
   article strong {
-    color: var(--sl-color-white);
-    font-size: 1.35rem;
+    color: var(--mc-text-primary);
+    font-size: var(--mc-fz-value);
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
+    line-height: 1.1;
   }
 
   .mc-note {
     margin: 0;
-    font-size: 0.9rem;
+    color: var(--mc-text-muted);
+    font-size: var(--mc-fz-body);
+    line-height: 1.5;
+  }
+
+  /* ── Reduced motion ────────────────────────────────────────── */
+  @media (prefers-reduced-motion: reduce) {
+    :global([data-monte-carlo] *),
+    :global([data-monte-carlo] *::before),
+    :global([data-monte-carlo] *::after) {
+      animation: none !important;
+      transition: none !important;
+    }
   }
 </style>

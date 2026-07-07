@@ -1,0 +1,18 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PortfolioAllocator from '../components/PortfolioAllocator';
+---
+
+<BaseLayout title="Allocateur de Portefeuille" description="Testez différentes allocations d'actifs et stratégies de rebalancement.">
+
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-slate-50">Allocateur de Portefeuille</h1>
+  <p class="mt-1 text-sm text-slate-400">
+    Configurez votre allocation cible, votre stratégie de rebalancement et vos versements.
+    La simulation se met à jour automatiquement.
+  </p>
+</div>
+
+<PortfolioAllocator client:load />
+
+</BaseLayout>

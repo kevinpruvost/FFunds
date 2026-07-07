@@ -1,0 +1,103 @@
+---
+import '../styles/globals.css';
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter/600.css';
+import '@fontsource/inter/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+
+export interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+const currentPath = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang="fr" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} — FFunds</title>
+    {description && <meta name="description" content={description} />}
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body class="min-h-screen bg-slate-950">
+    <!-- Sidebar state is stored on <body data-sidebar-open> so CSS can react.
+         A tiny inline script flips the attribute on button click and persists
+         the choice in localStorage so a refresh keeps the user's preference. -->
+    <script is:inline define:vars={{ initialOpen: true }}>
+      try {
+        const stored = localStorage.getItem("ffunds:sidebar-open");
+        if (stored === "0") document.body.setAttribute("data-sidebar-open", "false");
+      } catch {}
+    </script>
+    <button
+      id="sidebar-toggle"
+      type="button"
+      aria-label="Replier la sidebar"
+      class="fixed top-3 z-50 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-slate-300 transition-all hover:bg-slate-800 hover:text-slate-100"
+    >
+      <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+      </svg>
+    </button>
+    <script is:inline>
+      document.getElementById("sidebar-toggle").addEventListener("click", () => {
+        const current = document.body.getAttribute("data-sidebar-open") !== "false";
+        const next = current ? "false" : "true";
+        document.body.setAttribute("data-sidebar-open", next);
+        try { localStorage.setItem("ffunds:sidebar-open", next === "false" ? "0" : "1"); } catch {}
+      });
+    </script>
+
+    <!-- Sidebar -->
+    <aside
+      class="sidebar fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-slate-800 bg-slate-950/95 backdrop-blur transition-[width] duration-200 ease-in-out w-60 overflow-hidden"
+    >
+      <div class="flex items-center gap-2.5 border-b border-slate-800 px-4 py-5 whitespace-nowrap">
+        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20 shrink-0">
+          <span class="text-lg font-bold text-emerald-400">F</span>
+        </div>
+        <div class="min-w-0">
+          <p class="text-sm font-semibold text-slate-100 leading-tight">FFunds</p>
+          <p class="text-[10px] text-slate-500 leading-tight">Portfolio Intelligence</p>
+        </div>
+      </div>
+
+      <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+        <a href="/FFunds" class={`sidebar-link ${currentPath === '/FFunds/' || currentPath === '/FFunds' ? 'active' : ''}`}>
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1"></path></svg>
+          Accueil
+        </a>
+        <a href="/FFunds/allocator" class={`sidebar-link ${currentPath.includes('/allocator') ? 'active' : ''}`}>
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7C5 4 4 5 4 7z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 12h16"></path><circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"></circle><circle cx="8" cy="16" r="1.5" fill="currentColor" stroke="none"></circle><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"></circle></svg>
+          Allocateur
+        </a>
+        <a href="/FFunds/simulations" class={`sidebar-link ${currentPath.includes('/simulations') ? 'active' : ''}`}>
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+          Monte Carlo
+        </a>
+        <a href="/FFunds/knowledge" class={`sidebar-link ${currentPath.includes('/knowledge') ? 'active' : ''}`}>
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+          Connaissances
+        </a>
+      </nav>
+
+      <div class="border-t border-slate-800 px-4 py-3 whitespace-nowrap">
+        <p class="text-[10px] text-slate-600">FFunds · v0.2.0</p>
+      </div>
+    </aside>
+
+    <!-- Main content — left margin toggles with sidebar state -->
+    <main
+      class="main-with-sidebar flex-1 transition-[margin] duration-200 ease-in-out ml-60"
+    >
+      <div class="mx-auto max-w-7xl px-6 py-8">
+        <slot />
+      </div>
+    </main>
+  </body>
+</html>
