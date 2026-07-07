@@ -6,7 +6,6 @@ dist/
 .DS_Store
 
 agent_space/
-scripts/
 test*
 .omo/
 .opencode/
