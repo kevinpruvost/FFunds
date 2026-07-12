@@ -1,24 +1,21 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import MonteCarloSimulator from '../components/MonteCarloSimulator.astro';
+import { readLang } from '../i18n/astro-i18n';
+import { TRANSLATIONS } from '../i18n/translations';
+import MonteCarloSimulator from '../components/MonteCarloSimulator';
+
+const lang = readLang();
+const T = TRANSLATIONS[lang];
 ---
 
-<BaseLayout title="Simulation Monte Carlo" description="Simulez l'évolution de vos investissements avec la méthode Monte Carlo.">
+<BaseLayout title={T["sim.title"]} description={T["sim.subtitle"]}>
 
 <div class="mb-6">
-  <h1 class="text-2xl font-bold text-slate-50">Simulation Monte Carlo</h1>
-  <p class="mt-1 text-sm text-slate-400">
-    Projetez l'évolution possible d'un investissement entre votre âge actuel et votre âge de retraite,
-    à partir d'un rendement annuel composé (CAGR), d'un drawdown maximal estimé et d'une date d'arrêt des versements.
-  </p>
-  <p class="mt-2 text-xs text-slate-500">
-    Renseignez un <strong class="text-slate-400">objectif final visé</strong> (en euros), puis utilisez les boutons d'optimisation
-    pour calculer automatiquement l'investissement initial ou le versement mensuel nécessaire.
-  </p>
+  <h1 class="text-2xl font-bold text-slate-50" data-i18n="sim.title">{T["sim.title"]}</h1>
+  <p class="mt-1 text-sm text-slate-400" data-i18n="sim.subtitle">{T["sim.subtitle"]}</p>
+  <p class="mt-2 text-xs text-slate-500" data-i18n="sim.hint">{T["sim.hint"]}</p>
 </div>
 
-<div class="rounded-xl border border-slate-800 bg-slate-900/40 p-0 overflow-hidden">
-  <MonteCarloSimulator />
-</div>
+<MonteCarloSimulator client:load />
 
 </BaseLayout>

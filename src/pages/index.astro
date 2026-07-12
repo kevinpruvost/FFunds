@@ -1,15 +1,20 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { readLang } from '../i18n/astro-i18n';
+import { TRANSLATIONS } from '../i18n/translations';
+
+const lang = readLang();
+const T = TRANSLATIONS[lang];
+const isFr = lang === 'fr';
 ---
 
-<BaseLayout title="Accueil" description="FFunds — Intelligence de portefeuille et simulations financières">
+<BaseLayout title={T["home.title"]} description={T["home.subtitle"]}>
 
 <div class="mb-8">
-  <h1 class="text-2xl font-bold text-slate-50">Tableau de bord</h1>
-  <p class="mt-1 text-sm text-slate-400">Outils de simulation et d'allocation pour vos investissements.</p>
+  <h1 class="text-2xl font-bold text-slate-50" data-i18n="home.title">{T["home.title"]}</h1>
+  <p class="mt-1 text-sm text-slate-400" data-i18n="home.subtitle">{T["home.subtitle"]}</p>
 </div>
 
-<!-- Tool cards -->
 <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
   <a href="/FFunds/allocator"
      class="group block rounded-xl border border-slate-800 bg-slate-900/60 p-6
@@ -20,12 +25,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
               d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
       </svg>
     </div>
-    <h3 class="text-sm font-semibold text-slate-100 group-hover:text-emerald-400 transition-colors">Allocateur de Portefeuille</h3>
-    <p class="mt-1.5 text-xs text-slate-500 leading-relaxed">
-      Testez différentes allocations d'actifs, stratégies de rebalancement, et visualisez la performance historique.
-    </p>
+    <h3 class="text-sm font-semibold text-slate-100 group-hover:text-emerald-400 transition-colors" data-i18n="home.card.allocator.title">{T["home.card.allocator.title"]}</h3>
+    <p class="mt-1.5 text-xs text-slate-500 leading-relaxed" data-i18n="home.card.allocator.desc">{T["home.card.allocator.desc"]}</p>
     <span class="mt-4 inline-flex items-center gap-1 text-xs font-medium text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity">
-      Lancer
+      <span data-i18n="home.card.launch">{T["home.card.launch"]}</span>
       <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
     </span>
   </a>
@@ -39,12 +42,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
               d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
       </svg>
     </div>
-    <h3 class="text-sm font-semibold text-slate-100 group-hover:text-blue-400 transition-colors">Simulation Monte Carlo</h3>
-    <p class="mt-1.5 text-xs text-slate-500 leading-relaxed">
-      Projetez l'évolution de vos investissements avec des milliers de scénarios aléatoires.
-    </p>
+    <h3 class="text-sm font-semibold text-slate-100 group-hover:text-blue-400 transition-colors" data-i18n="home.card.simulations.title">{T["home.card.simulations.title"]}</h3>
+    <p class="mt-1.5 text-xs text-slate-500 leading-relaxed" data-i18n="home.card.simulations.desc">{T["home.card.simulations.desc"]}</p>
     <span class="mt-4 inline-flex items-center gap-1 text-xs font-medium text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
-      Lancer
+      <span data-i18n="home.card.launch">{T["home.card.launch"]}</span>
       <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
     </span>
   </a>
@@ -58,38 +59,47 @@ import BaseLayout from '../layouts/BaseLayout.astro';
               d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
       </svg>
     </div>
-    <h3 class="text-sm font-semibold text-slate-100 group-hover:text-amber-400 transition-colors">Connaissances</h3>
-    <p class="mt-1.5 text-xs text-slate-500 leading-relaxed">
-      Notions essentielles sur l'investissement, la diversification, les frais et la fiscalité.
-    </p>
+    <h3 class="text-sm font-semibold text-slate-100 group-hover:text-amber-400 transition-colors" data-i18n="home.card.knowledge.title">{T["home.card.knowledge.title"]}</h3>
+    <p class="mt-1.5 text-xs text-slate-500 leading-relaxed" data-i18n="home.card.knowledge.desc">{T["home.card.knowledge.desc"]}</p>
     <span class="mt-4 inline-flex items-center gap-1 text-xs font-medium text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity">
-      Explorer
+      <span data-i18n="home.card.explore">{T["home.card.explore"]}</span>
       <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
     </span>
   </a>
 </div>
 
-<!-- Quick stats row (placeholder) -->
-<div class="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+<div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
   <div class="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
-    <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Actifs simulés</p>
-    <p class="mt-1 text-2xl font-semibold tabular-nums text-slate-100">8</p>
-    <p class="mt-0.5 text-xs text-slate-600">Actions, obligations, or, BTC, futures</p>
+    <div class="flex items-center gap-2">
+      <svg class="h-4 w-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+      <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500" data-i18n="home.stats.assets">{T["home.stats.assets"]}</p>
+    </div>
+    <p class="mt-2 text-2xl font-semibold tabular-nums text-slate-100">24</p>
+    <p class="mt-0.5 text-xs text-slate-600" data-i18n="home.stats.assets.desc">{T["home.stats.assets.desc"]}</p>
   </div>
   <div class="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
-    <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Stratégies</p>
-    <p class="mt-1 text-2xl font-semibold tabular-nums text-slate-100">3</p>
-    <p class="mt-0.5 text-xs text-slate-600">Rebalancement annuel, seuil, bandes</p>
+    <div class="flex items-center gap-2">
+      <svg class="h-4 w-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m0 0a8 8 0 018 8 8 8 0 01-8 8 8 8 0 01-8-8m16 3v5h-5m0 0a8 8 0 01-8-8 8 8 0 018-8m0 0h5v5"></path></svg>
+      <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500" data-i18n="home.stats.strategies">{T["home.stats.strategies"]}</p>
+    </div>
+    <p class="mt-2 text-2xl font-semibold tabular-nums text-slate-100">6</p>
+    <p class="mt-0.5 text-xs text-slate-600" data-i18n="home.stats.strategies.desc">{T["home.stats.strategies.desc"]}</p>
   </div>
   <div class="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
-    <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Données historiques</p>
-    <p class="mt-1 text-2xl font-semibold tabular-nums text-slate-100">20 ans</p>
-    <p class="mt-0.5 text-xs text-slate-600">Juin 2006 → Juin 2026</p>
+    <div class="flex items-center gap-2">
+      <svg class="h-4 w-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500" data-i18n="home.stats.history">{T["home.stats.history"]}</p>
+    </div>
+    <p class="mt-2 text-2xl font-semibold tabular-nums text-slate-100">38 {isFr ? 'ans' : 'yrs'}</p>
+    <p class="mt-0.5 text-xs text-slate-600" data-i18n="home.stats.history.desc">{T["home.stats.history.desc"]}</p>
   </div>
   <div class="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
-    <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Simulations</p>
-    <p class="mt-1 text-2xl font-semibold tabular-nums text-slate-100">10 000</p>
-    <p class="mt-0.5 text-xs text-slate-600">Scénarios Monte Carlo par exécution</p>
+    <div class="flex items-center gap-2">
+      <svg class="h-4 w-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+      <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500" data-i18n="home.stats.simulations">{T["home.stats.simulations"]}</p>
+    </div>
+    <p class="mt-2 text-2xl font-semibold tabular-nums text-slate-100">5 000</p>
+    <p class="mt-0.5 text-xs text-slate-600" data-i18n="home.stats.simulations.desc">{T["home.stats.simulations.desc"]}</p>
   </div>
 </div>
 

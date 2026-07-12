@@ -36,6 +36,8 @@ import {
 
 import pricesData from "../data/prices.json";
 import tickersConfig from "../data/tickers.config.json";
+import { I18nProvider, useI18n } from "../i18n/I18nProvider";
+import { TRANSLATIONS } from "../i18n/translations";
 
 /* ─────────────────────────── Types ─────────────────────────── */
 
@@ -155,7 +157,7 @@ const PRESETS: Record<string, Record<string, number>> = {
     IEF: 10,
     GLD: 7.5,
     DBC: 7.5,
-    DBMF: 15,
+    KMLM: 15,
   },
   "equal-weight": {}, // computed dynamically
   aggressive: {
@@ -168,43 +170,40 @@ const PRESETS: Record<string, Record<string, number>> = {
   },
 };
 
-const CLASS_LABELS: Record<string, string> = {
-  "actions-us": "Actions US",
-  "actions-intl": "Actions Intl",
-  "actions-em": "Émergents",
-  obligations: "Obligations",
-  secteur: "Secteurs",
-  matieres: "Matières",
-  crypto: "Crypto",
-  alternatif: "Alternatif",
-  "indices-monde": "Indices Monde",
+const CLASS_KEYS: Record<string, string> = {
+  "actions-us": "alloc.classLabel.actions-us",
+  "actions-intl": "alloc.classLabel.actions-intl",
+  "actions-em": "alloc.classLabel.actions-em",
+  obligations: "alloc.classLabel.obligations",
+  secteur: "alloc.classLabel.secteur",
+  matieres: "alloc.classLabel.matieres",
+  crypto: "alloc.classLabel.crypto",
+  alternatif: "alloc.classLabel.alternatif",
+  "indices-monde": "alloc.classLabel.indices-monde",
 };
 
 /* ─────────────────────────── Utilities ─────────────────────────── */
 
-const eurFormatter = new Intl.NumberFormat("fr-FR", {
-  style: "currency",
-  currency: "EUR",
-  maximumFractionDigits: 0,
-});
+const eurFormatters: Record<string, Intl.NumberFormat> = {
+  fr: new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }),
+  en: new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }),
+};
+const compactEurFormatters: Record<string, Intl.NumberFormat> = {
+  fr: new Intl.NumberFormat("fr-FR", { notation: "compact", style: "currency", currency: "EUR", maximumFractionDigits: 1 }),
+  en: new Intl.NumberFormat("en-US", { notation: "compact", style: "currency", currency: "EUR", maximumFractionDigits: 1 }),
+};
 
-const compactEurFormatter = new Intl.NumberFormat("fr-FR", {
-  notation: "compact",
-  style: "currency",
-  currency: "EUR",
-  maximumFractionDigits: 1,
-});
-
-function formatEUR(n: number): string {
-  return eurFormatter.format(n);
+function formatEUR(n: number, lang: string = "fr"): string {
+  return (eurFormatters[lang] ?? eurFormatters.fr).format(n);
 }
 
-function formatCompactEUR(n: number): string {
-  return compactEurFormatter.format(n);
+function formatCompactEUR(n: number, lang: string = "fr"): string {
+  return (compactEurFormatters[lang] ?? compactEurFormatters.fr).format(n);
 }
 
-function formatPct(n: number, digits = 1): string {
-  return `${n.toFixed(digits).replace(".", ",")} %`;
+function formatPct(n: number, digits = 1, lang: string = "fr"): string {
+  const sep = lang === "en" ? "." : ",";
+  return `${n.toFixed(digits).replace(".", sep)} %`;
 }
 
 function nextMonth(m: string): string {
@@ -530,7 +529,8 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
 
 /* ─────────────────────────── Component ─────────────────────────── */
 
-export default function PortfolioAllocator(): JSX.Element {
+function PortfolioAllocatorInner(): JSX.Element {
+  const { lang, t } = useI18n();
   const [selectedTickers, setSelectedTickers] = useState<string[]>(["SPY", "SHY"]);
   const [weights, setWeights] = useState<Record<string, number>>({ SPY: 60, SHY: 40 });
   const [locked, setLocked] = useState<Record<string, boolean>>({});
@@ -544,7 +544,7 @@ export default function PortfolioAllocator(): JSX.Element {
   const [marginLeverage, setMarginLeverage] = useState<number>(1.5);
   const [marginLoanRatePct, setMarginLoanRatePct] = useState<number>(5);
   const [marginInterestFreq, setMarginInterestFreq] = useState<SimulationInput["marginInterestFreq"]>("monthly");
-  const [marginRebalance, setMarginRebalance] = useState<boolean>(false);
+  const [marginRebalance, setMarginRebalance] = useState<boolean>(true);
   const [marginRebalanceMode, setMarginRebalanceMode] = useState<SimulationInput["marginRebalanceMode"]>("gains-only");
 
   // Custom tickers state
@@ -839,7 +839,7 @@ export default function PortfolioAllocator(): JSX.Element {
         if (json !== undefined) break;
       }
       if (json === undefined) {
-        throw lastErr instanceof Error ? lastErr : new Error("Tous les proxies CORS ont échoué");
+        throw lastErr instanceof Error ? lastErr : new Error("alloc.custom.fetchFailAll");
       }
 
       const chart = (json as { chart?: { result?: unknown[]; error?: { description?: string } } }).chart;
@@ -854,7 +854,7 @@ export default function PortfolioAllocator(): JSX.Element {
           adjclose?: { adjclose?: (number | null)[] }[];
         };
       } | undefined;
-      if (!result) throw new Error("Aucune donnée disponible");
+      if (!result) throw new Error("alloc.custom.noData");
 
       const timestamps: number[] = result.timestamp || [];
       const quote: (number | null)[] = result.indicators?.quote?.[0]?.close || [];
@@ -867,7 +867,7 @@ export default function PortfolioAllocator(): JSX.Element {
         monthly.push({ date: formatDate(timestamps[i]), close: Number(close) });
       }
 
-      if (monthly.length === 0) throw new Error("Aucun prix valide trouvé");
+      if (monthly.length === 0) throw new Error("alloc.custom.noValidPrices");
 
       const ct: CustomTicker = {
         ticker,
@@ -886,7 +886,7 @@ export default function PortfolioAllocator(): JSX.Element {
       });
       setCustomInput("");
     } catch (err) {
-      setCustomError(err instanceof Error ? err.message : "Erreur inconnue");
+      setCustomError(err instanceof Error ? err.message : "alloc.custom.unknownError");
     } finally {
       setCustomLoading(false);
     }
@@ -919,11 +919,11 @@ export default function PortfolioAllocator(): JSX.Element {
     const raw = customInput.trim().toUpperCase();
     if (!raw) return;
     if (!/^[A-Z^][A-Z0-9.\-]+$/.test(raw)) {
-      setCustomError("Format de ticker invalide. Ex: TSLA, ^DJI, ABI.DE");
+      setCustomError("alloc.custom.badFormat");
       return;
     }
     if (allTickers.some((t) => t.ticker === raw)) {
-      setCustomError(`Le ticker ${raw} est déjà présent.`);
+      setCustomError(`alloc.custom.alreadyExists:${raw}`);
       return;
     }
     fetchCustomTicker(raw);
@@ -975,10 +975,16 @@ export default function PortfolioAllocator(): JSX.Element {
     const filtered: Record<string, TickerMeta[]> = {};
     for (const [cls, list] of Object.entries(groupedTickers)) {
       const matches = list.filter(
-        (t) =>
-          t.ticker.toLowerCase().includes(term) ||
-          t.name.toLowerCase().includes(term) ||
-          (CLASS_LABELS[t.class] ?? t.class).toLowerCase().includes(term)
+        (t) => {
+          const frLabel = TRANSLATIONS.fr[`alloc.classLabel.${t.class}`] ?? t.class;
+          const enLabel = TRANSLATIONS.en[`alloc.classLabel.${t.class}`] ?? t.class;
+          return (
+            t.ticker.toLowerCase().includes(term) ||
+            t.name.toLowerCase().includes(term) ||
+            frLabel.toLowerCase().includes(term) ||
+            enLabel.toLowerCase().includes(term)
+          );
+        }
       );
       if (matches.length > 0) filtered[cls] = matches;
     }
@@ -994,11 +1000,11 @@ export default function PortfolioAllocator(): JSX.Element {
         </Text>
         {payload.map((p, i) => (
           <div key={i} className="text-tremor-content dark:text-slate-400 text-xs">
-            {p.dataKey === "value" && `Valeur brute : ${formatEUR(p.value)}`}
-            {p.dataKey === "equity" && `Valeur nette : ${formatEUR(p.value)}`}
-            {p.dataKey === "invested" && `Versé : ${formatEUR(p.value)}`}
-            {p.dataKey === "loan" && `Emprunt : ${formatEUR(p.value)}`}
-            {p.dataKey === "drawdown" && `Drawdown : ${p.value.toFixed(1)} %`}
+            {p.dataKey === "value" && `${t("alloc.chart.value")}: ${formatEUR(p.value, lang)}`}
+            {p.dataKey === "equity" && `${t("alloc.chart.equity")}: ${formatEUR(p.value, lang)}`}
+            {p.dataKey === "invested" && `${t("alloc.chart.invested")}: ${formatEUR(p.value, lang)}`}
+            {p.dataKey === "loan" && `${t("alloc.chart.loan")}: ${formatEUR(p.value, lang)}`}
+            {p.dataKey === "drawdown" && `${t("alloc.chart.drawdownLabel")}: ${p.value.toFixed(1)} %`}
             {p.dataKey === "allocation" && `${p.value.toFixed(1)} %`}
           </div>
         ))}
@@ -1010,37 +1016,33 @@ export default function PortfolioAllocator(): JSX.Element {
     <div className="dark space-y-6">
       {/* Info banners */}
       {!isBalanced && selectedTickers.length > 0 && (
-        <Callout title="Allocation auto-normalisée" color="amber" className="border-amber-800 bg-amber-950/40">
+        <Callout title={t("alloc.callout.unbalanced.title")} color="amber" className="border-amber-800 bg-amber-950/40">
           <Text className="text-amber-300">
-            Total : {formatPct(totalWeight, 2)}. Les poids sont automatiquement normalisés à 100 % dans le calcul du backtest.
+            {t("alloc.callout.unbalanced.body", { total: formatPct(totalWeight, 2, lang) })}
           </Text>
         </Callout>
       )}
 
       {result && (
-        <Callout title="Période historique" color="emerald" className="border-emerald-800 bg-emerald-950/40">
+        <Callout title={t("alloc.callout.period.title")} color="emerald" className="border-emerald-800 bg-emerald-950/40">
           <Text className="text-emerald-300">
-            Backtest du <strong>{result.startMonth}</strong> au <strong>{result.endMonth}</strong>
-            {" "}(<strong>{result.months.length}</strong> mois).
-            Limité par l&apos;historique de <strong>{result.limitingTickerName}</strong> ({result.limitingTicker}).
+            {t("alloc.callout.period.body", { start: result.startMonth, end: result.endMonth, months: String(result.months.length), name: result.limitingTickerName, ticker: result.limitingTicker })}
           </Text>
         </Callout>
       )}
 
       {result?.marginEnabled && (
-        <Callout title={`Levier ${result.marginLeverage.toFixed(2)}× — Marge activée`} color="amber" className="border-amber-800 bg-amber-950/40">
+        <Callout title={t("alloc.callout.margin.title", { leverage: result.marginLeverage.toFixed(2) })} color="amber" className="border-amber-800 bg-amber-950/40">
           <Text className="text-amber-300">
-            Emprunt initial : <strong>{formatEUR(result.loanAmount)}</strong> au taux annuel de <strong>{formatPct(marginLoanRatePct, 2)}</strong>
-            {" "}({marginInterestFreq === "monthly" ? "intérêts mensuels" : "intérêts annuels"}).
-            Total des intérêts payés sur la période : <strong>{formatEUR(result.totalInterestPaid)}</strong>.
+            {t("alloc.callout.margin.body", { loan: formatEUR(result.loanAmount, lang), rate: formatPct(marginLoanRatePct, 2, lang), freq: marginInterestFreq === "monthly" ? t("alloc.callout.margin.freqMonthly") : t("alloc.callout.margin.freqYearly"), interest: formatEUR(result.totalInterestPaid, lang) })}
           </Text>
         </Callout>
       )}
 
       {result?.liquidationMonth && (
-        <Callout title="Liquidation (margin call)" color="rose" className="border-rose-800 bg-rose-950/40">
+        <Callout title={t("alloc.callout.liquidation.title")} color="rose" className="border-rose-800 bg-rose-950/40">
           <Text className="text-rose-300">
-            Le portefeuille a été liquidé en <strong>{result.liquidationMonth}</strong> : la valeur nette est tombée à zéro. Capital restant à risque.
+            {t("alloc.callout.liquidation.body", { month: result.liquidationMonth })}
           </Text>
         </Callout>
       )}
@@ -1051,9 +1053,9 @@ export default function PortfolioAllocator(): JSX.Element {
           {/* Ticker picker */}
           <Card className="bg-tremor-background dark:bg-slate-900/60 border-tremor-border border">
             <div className="flex items-center justify-between mb-4">
-              <Title className="text-tremor-content-strong dark:text-slate-100">Sélection des actifs</Title>
+              <Title className="text-tremor-content-strong dark:text-slate-100">{t("alloc.col.assets.title")}</Title>
               <Text className="text-tremor-content dark:text-slate-400 text-xs">
-                {selectedTickers.length} sélectionné{selectedTickers.length > 1 ? "s" : ""}
+                {t("alloc.col.assets.selected", { n: String(selectedTickers.length) })}
               </Text>
             </div>
 
@@ -1063,7 +1065,7 @@ export default function PortfolioAllocator(): JSX.Element {
                 type="text"
                 value={filterText}
                 onChange={(e) => setFilterText(e.target.value)}
-                placeholder="Filtrer par nom, ticker ou classe…"
+                placeholder={t("alloc.col.assets.filterPlaceholder")}
                 className="w-full rounded-tremor-small bg-slate-800 border border-slate-700 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
               />
             </div>
@@ -1072,7 +1074,7 @@ export default function PortfolioAllocator(): JSX.Element {
               {Object.entries(filteredGroups).map(([cls, list]) => (
                 <div key={cls}>
                   <Text className="text-tremor-content dark:text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1.5">
-                    {CLASS_LABELS[cls] ?? cls}
+                    {t(CLASS_KEYS[cls] ?? `alloc.classLabel.${cls}`)}
                   </Text>
                   <Grid numItems={2} numItemsSm={3} className="gap-2">
                     {list.map((t) => {
@@ -1111,7 +1113,7 @@ export default function PortfolioAllocator(): JSX.Element {
                                 removeCustomTicker(t.ticker);
                               }}
                               className="shrink-0 text-slate-500 hover:text-rose-400 transition-colors"
-                              title="Supprimer"
+                              title={t("alloc.col.assets.delete")}
                             >
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="18" y1="6" x2="6" y2="18" />
@@ -1131,7 +1133,7 @@ export default function PortfolioAllocator(): JSX.Element {
           {/* Custom ticker input */}
           <Card className="bg-tremor-background dark:bg-slate-900/60 border-tremor-border border">
             <Title className="text-tremor-content-strong dark:text-slate-100 mb-3 text-base">
-              + Ajouter un ticker Yahoo personnalisé
+              {t("alloc.col.assets.customTitle")}
             </Title>
             <div className="flex items-center gap-2">
               <input
@@ -1144,7 +1146,7 @@ export default function PortfolioAllocator(): JSX.Element {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleAddCustom();
                 }}
-                placeholder="Ex: TSLA, AAPL, ^DJI, ABI.DE"
+                placeholder={t("alloc.col.assets.customPlaceholder")}
                 className="flex-1 rounded-tremor-small bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
               />
               <Button
@@ -1156,23 +1158,27 @@ export default function PortfolioAllocator(): JSX.Element {
                 {customLoading ? (
                   <div className="flex items-center gap-1.5">
                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span className="text-xs">Chargement…</span>
+                    <span className="text-xs">{t("alloc.col.assets.customLoading")}</span>
                   </div>
                 ) : (
-                  "Ajouter"
+                  t("alloc.col.assets.customAdd")
                 )}
               </Button>
             </div>
             {customError && (
-              <Callout title="Erreur" color="rose" className="mt-3 border-rose-800 bg-rose-950/40">
-                <Text className="text-rose-300 text-xs">{customError}</Text>
+              <Callout title={t("alloc.callout.error.title")} color="rose" className="mt-3 border-rose-800 bg-rose-950/40">
+                <Text className="text-rose-300 text-xs">
+                  {customError.startsWith("alloc.custom.alreadyExists:")
+                    ? t("alloc.custom.alreadyExists", { ticker: customError.split(":")[1] })
+                    : t(customError)}
+                </Text>
               </Callout>
             )}
 
             {/* Custom ticker list with refresh */}
             {Object.keys(customTickers).length > 0 && (
               <div className="mt-3 space-y-1.5">
-                <Text className="text-tremor-content dark:text-slate-500 text-xs font-medium">Tickers personnalisés</Text>
+                <Text className="text-tremor-content dark:text-slate-500 text-xs font-medium">{t("alloc.col.assets.customList")}</Text>
                 {Object.values(customTickers).map((ct) => (
                   <div key={ct.ticker} className="flex items-center justify-between rounded-tremor-small bg-slate-800/50 border border-slate-700/50 px-3 py-2">
                     <div className="flex items-center gap-2 min-w-0">
@@ -1187,13 +1193,13 @@ export default function PortfolioAllocator(): JSX.Element {
                         onClick={() => refreshCustomTicker(ct.ticker)}
                         className="bg-slate-700 text-slate-300 hover:bg-slate-600"
                       >
-                        Rafraîchir
+                        {t("alloc.col.assets.refresh")}
                       </Button>
                       <button
                         type="button"
                         onClick={() => removeCustomTicker(ct.ticker)}
                         className="text-slate-500 hover:text-rose-400 transition-colors"
-                        title="Supprimer"
+                        title={t("alloc.col.assets.delete")}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <line x1="18" y1="6" x2="6" y2="18" />
@@ -1211,12 +1217,12 @@ export default function PortfolioAllocator(): JSX.Element {
           {selectedTickers.length > 0 && (
             <Card className="bg-tremor-background dark:bg-slate-900/60 border-tremor-border border">
               <div className="flex items-center justify-between mb-4">
-                <Title className="text-tremor-content-strong dark:text-slate-100">Allocation des actifs</Title>
+                <Title className="text-tremor-content-strong dark:text-slate-100">{t("alloc.col.weights.title")}</Title>
                 <Badge
                   color={isBalanced ? "emerald" : "amber"}
                   className={isBalanced ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}
                 >
-                  Total : {formatPct(totalWeight, 2)} {isBalanced ? "" : "(auto-normalisé)"}
+                  {t("alloc.col.weights.total", { total: formatPct(totalWeight, 2, lang) })} {isBalanced ? "" : t("alloc.col.weights.autoNormalized")}
                 </Badge>
               </div>
 
@@ -1227,7 +1233,7 @@ export default function PortfolioAllocator(): JSX.Element {
                   onClick={() => setAutoNormalize((v) => !v)}
                   className={autoNormalize ? "bg-tremor-brand dark:bg-emerald-600 text-white" : "bg-slate-800 text-slate-300"}
                 >
-                  Auto-normaliser : {autoNormalize ? "ON" : "OFF"}
+                  {t("alloc.col.weights.autoNormalize")} : {autoNormalize ? "ON" : "OFF"}
                 </Button>
               </div>
 
@@ -1249,7 +1255,7 @@ export default function PortfolioAllocator(): JSX.Element {
                                 ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
                                 : "bg-slate-800 border-slate-700 text-slate-500 hover:text-slate-300"
                             }`}
-                            title={isLocked ? "Déverrouiller" : "Verrouiller"}
+                            title={isLocked ? t("alloc.col.weights.unlock") : t("alloc.col.weights.lock")}
                           >
                             {isLocked ? (
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1303,7 +1309,7 @@ export default function PortfolioAllocator(): JSX.Element {
                               ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
                               : "bg-slate-800 border-slate-700 text-slate-500 hover:text-slate-300"
                           }`}
-                          title={isLocked ? "Déverrouiller" : "Verrouiller"}
+                          title={isLocked ? t("alloc.col.weights.unlock") : t("alloc.col.weights.lock")}
                         >
                           {isLocked ? (
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1356,19 +1362,19 @@ export default function PortfolioAllocator(): JSX.Element {
 
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button size="xs" variant="secondary" onClick={() => applyPreset("golden")} className="bg-slate-800 text-slate-300 hover:bg-slate-700">
-                  Ratio d&apos;Or
+                  {t("alloc.preset.golden")}
                 </Button>
                 <Button size="xs" variant="secondary" onClick={() => applyPreset("60/40")} className="bg-slate-800 text-slate-300 hover:bg-slate-700">
-                  60/40
+                  {t("alloc.preset.6040")}
                 </Button>
                 <Button size="xs" variant="secondary" onClick={() => applyPreset("all-weather")} className="bg-slate-800 text-slate-300 hover:bg-slate-700">
-                  Tout Temps
+                  {t("alloc.preset.allWeather")}
                 </Button>
                 <Button size="xs" variant="secondary" onClick={() => applyPreset("equal-weight")} className="bg-slate-800 text-slate-300 hover:bg-slate-700">
-                  Équiréparti
+                  {t("alloc.preset.equalWeight")}
                 </Button>
                 <Button size="xs" variant="secondary" onClick={() => applyPreset("aggressive")} className="bg-slate-800 text-slate-300 hover:bg-slate-700">
-                  Agressif Croissance
+                  {t("alloc.preset.aggressive")}
                 </Button>
               </div>
             </Card>
@@ -1376,10 +1382,10 @@ export default function PortfolioAllocator(): JSX.Element {
 
           {/* Configuration */}
           <Card className="bg-tremor-background dark:bg-slate-900/60 border-tremor-border border">
-            <Title className="text-tremor-content-strong dark:text-slate-100 mb-4">Configuration</Title>
+            <Title className="text-tremor-content-strong dark:text-slate-100 mb-4">{t("alloc.col.config")}</Title>
             <Grid numItems={1} numItemsSm={2} className="gap-4">
               <Col>
-                <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">Investissement initial (EUR)</Text>
+                <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">{t("alloc.col.config.investment")}</Text>
                 <NumberInput
                   value={initialInvestment}
                   onValueChange={(v) => setInitialInvestment(Math.max(0, v ?? 0))}
@@ -1389,7 +1395,7 @@ export default function PortfolioAllocator(): JSX.Element {
                 />
               </Col>
               <Col>
-                <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">Versement mensuel (EUR)</Text>
+                <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">{t("alloc.col.config.monthly")}</Text>
                 <NumberInput
                   value={monthlyContribution}
                   onValueChange={(v) => setMonthlyContribution(Math.max(0, v ?? 0))}
@@ -1399,14 +1405,14 @@ export default function PortfolioAllocator(): JSX.Element {
                 />
               </Col>
               <Col>
-                <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">Stratégie de rebalancement</Text>
+                <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">{t("alloc.col.config.rebalance")}</Text>
                 <Select value={rebalance} onValueChange={(v) => setRebalance(v as SimulationInput["rebalance"])} className="bg-slate-900 border-slate-800 text-slate-200">
-                  <SelectItem value="none">Aucun</SelectItem>
-                  <SelectItem value="monthly">Mensuel</SelectItem>
-                  <SelectItem value="quarterly">Trimestriel</SelectItem>
-                  <SelectItem value="annual">Annuel</SelectItem>
-                  <SelectItem value="threshold5">Seuil (5 %)</SelectItem>
-                  <SelectItem value="bands5_25">Bandes (5 % / 25 %)</SelectItem>
+                  <SelectItem value="none">{t("alloc.col.config.rebalance.none")}</SelectItem>
+                  <SelectItem value="monthly">{t("alloc.col.config.rebalance.monthly")}</SelectItem>
+                  <SelectItem value="quarterly">{t("alloc.col.config.rebalance.quarterly")}</SelectItem>
+                  <SelectItem value="annual">{t("alloc.col.config.rebalance.annual")}</SelectItem>
+                  <SelectItem value="threshold5">{t("alloc.col.config.rebalance.threshold5")}</SelectItem>
+                  <SelectItem value="bands5_25">{t("alloc.col.config.rebalance.bands5_25")}</SelectItem>
                 </Select>
               </Col>
             </Grid>
@@ -1414,24 +1420,24 @@ export default function PortfolioAllocator(): JSX.Element {
             {/* Margin loan */}
             <div className="mt-5 pt-4 border-t border-slate-700/50">
               <div className="flex items-center justify-between mb-3">
-                <Title className="text-tremor-content-strong dark:text-slate-100 text-base">Marge / Levier</Title>
+                <Title className="text-tremor-content-strong dark:text-slate-100 text-base">{t("alloc.col.config.margin.title")}</Title>
                 <Button
                   size="xs"
                   variant={marginEnabled ? "primary" : "secondary"}
                   onClick={() => setMarginEnabled((v) => !v)}
                   className={marginEnabled ? "bg-tremor-brand dark:bg-emerald-600 text-white" : "bg-slate-800 text-slate-300"}
                 >
-                  Marge : {marginEnabled ? "ON" : "OFF"}
+                  {t("alloc.col.config.margin.title")} : {marginEnabled ? "ON" : "OFF"}
                 </Button>
               </div>
               {marginEnabled && (
                 <>
                   <Text className="text-tremor-content dark:text-slate-500 text-xs mb-3">
-                    Emprunte <strong>{formatEUR(loanPreview)}</strong> au départ pour porter le portefeuille à <strong>{marginLeverage.toFixed(2)}×</strong> la mise initiale. Les intérêts sont déduits du portefeuille.
+                    {t("alloc.col.config.margin.explain", { loan: formatEUR(loanPreview, lang), leverage: marginLeverage.toFixed(2) })}
                   </Text>
                   <Grid numItems={1} numItemsSm={3} className="gap-4">
                     <Col>
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">Levier (× la mise)</Text>
+                      <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">{t("alloc.col.config.margin.leverage")}</Text>
                       <NumberInput
                         value={marginLeverage}
                         onValueChange={(v) => setMarginLeverage(Math.max(1, Math.min(5, v ?? 1)))}
@@ -1442,7 +1448,7 @@ export default function PortfolioAllocator(): JSX.Element {
                       />
                     </Col>
                     <Col>
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">Taux d&apos;emprunt annuel (%)</Text>
+                      <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">{t("alloc.col.config.margin.rate")}</Text>
                       <NumberInput
                         value={marginLoanRatePct}
                         onValueChange={(v) => setMarginLoanRatePct(Math.max(0, Math.min(50, v ?? 0)))}
@@ -1453,21 +1459,21 @@ export default function PortfolioAllocator(): JSX.Element {
                       />
                     </Col>
                     <Col>
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">Fréquence des intérêts</Text>
+                      <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">{t("alloc.col.config.margin.freq")}</Text>
                       <Select
                         value={marginInterestFreq}
                         onValueChange={(v) => setMarginInterestFreq(v as SimulationInput["marginInterestFreq"])}
                         className="bg-slate-900 border-slate-800 text-slate-200"
                       >
-                        <SelectItem value="monthly">Mensuelle</SelectItem>
-                        <SelectItem value="yearly">Annuelle</SelectItem>
+                        <SelectItem value="monthly">{t("alloc.col.config.margin.freqMonthly")}</SelectItem>
+                        <SelectItem value="yearly">{t("alloc.col.config.margin.freqYearly")}</SelectItem>
                       </Select>
                     </Col>
                   </Grid>
 
                   <div className="mt-4 pt-3 border-t border-slate-700/50">
                     <div className="flex items-center justify-between mb-2">
-                      <Text className="text-tremor-content dark:text-slate-400 text-sm font-medium">Ré-endettement (restaurer le levier)</Text>
+                      <Text className="text-tremor-content dark:text-slate-400 text-sm font-medium">{t("alloc.col.config.margin.relevTitle")}</Text>
                       <Button
                         size="xs"
                         variant={marginRebalance ? "primary" : "secondary"}
@@ -1480,17 +1486,17 @@ export default function PortfolioAllocator(): JSX.Element {
                     {marginRebalance && (
                       <>
                         <Text className="text-tremor-content dark:text-slate-500 text-xs mb-2">
-                          Chaque mois, l&apos;emprunt est ajusté pour restaurer le levier cible sur la valeur nette courante.
+                          {t("alloc.col.config.margin.relevExplain")}
                         </Text>
                         <div className="max-w-xs">
-                          <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">Mode de ré-endettement</Text>
+                          <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">{t("alloc.col.config.margin.relevModeLabel")}</Text>
                           <Select
                             value={marginRebalanceMode}
                             onValueChange={(v) => setMarginRebalanceMode(v as SimulationInput["marginRebalanceMode"])}
                             className="bg-slate-900 border-slate-800 text-slate-200"
                           >
-                            <SelectItem value="gains-only">Emprunter sur plus-values uniquement</SelectItem>
-                            <SelectItem value="bidirectional">Emprunter sur gains + rembourser sur pertes</SelectItem>
+                            <SelectItem value="gains-only">{t("alloc.col.config.margin.relevModeGains")}</SelectItem>
+                            <SelectItem value="bidirectional">{t("alloc.col.config.margin.relevModeBi")}</SelectItem>
                           </Select>
                         </div>
                       </>
@@ -1505,19 +1511,19 @@ export default function PortfolioAllocator(): JSX.Element {
         {/* ─── Right column ─── */}
         <Col>
           <Card className="bg-tremor-background dark:bg-slate-900/60 border-tremor-border border h-full">
-            <Title className="text-tremor-content-strong dark:text-slate-100 mb-4">Résultats de la simulation</Title>
+            <Title className="text-tremor-content-strong dark:text-slate-100 mb-4">{t("alloc.col.resultsTitle")}</Title>
 
             {isPending && (
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                <Text className="text-tremor-content dark:text-slate-400 text-sm">Calcul en cours…</Text>
+                <Text className="text-tremor-content dark:text-slate-400 text-sm">{t("alloc.computing")}</Text>
               </div>
             )}
 
             {selectedTickers.length === 0 && (
-              <Callout title="Aucun actif sélectionné" color="amber" className="border-amber-800 bg-amber-950/40">
+              <Callout title={t("alloc.callout.noAssets.title")} color="amber" className="border-amber-800 bg-amber-950/40">
                 <Text className="text-amber-300">
-                  Sélectionnez au moins un actif dans le panneau de gauche pour lancer la simulation.
+                  {t("alloc.callout.noAssets.body")}
                 </Text>
               </Callout>
             )}
@@ -1528,37 +1534,37 @@ export default function PortfolioAllocator(): JSX.Element {
                 <Grid numItems={2} numItemsSm={3} className="gap-3 mb-6">
                   <Col>
                     <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs">Valeur finale</Text>
-                      <Metric className="text-tremor-content-strong dark:text-slate-100 text-lg">{formatEUR(result.finalValue)}</Metric>
+                      <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.finalValue")}</Text>
+                      <Metric className="text-tremor-content-strong dark:text-slate-100 text-lg">{formatEUR(result.finalValue, lang)}</Metric>
                     </Card>
                   </Col>
                   <Col>
                     <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs">Total investi</Text>
-                      <Metric className="text-tremor-content-strong dark:text-slate-100 text-lg">{formatEUR(result.totalInvested)}</Metric>
+                      <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.totalInvested")}</Text>
+                      <Metric className="text-tremor-content-strong dark:text-slate-100 text-lg">{formatEUR(result.totalInvested, lang)}</Metric>
                     </Card>
                   </Col>
                   <Col>
                     <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs">CAGR</Text>
-                      <Metric className="text-tremor-brand dark:text-emerald-400 text-lg">{formatPct(result.cagr * 100)}</Metric>
+                      <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.cagr")}</Text>
+                      <Metric className="text-tremor-brand dark:text-emerald-400 text-lg">{formatPct(result.cagr * 100, 2, lang)}</Metric>
                     </Card>
                   </Col>
                   <Col>
                     <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs">Volatilité annuelle</Text>
-                      <Metric className="text-tremor-content-strong dark:text-slate-100 text-lg">{formatPct(result.volatility * 100)}</Metric>
+                      <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.volatility")}</Text>
+                      <Metric className="text-tremor-content-strong dark:text-slate-100 text-lg">{formatPct(result.volatility * 100, 2, lang)}</Metric>
                     </Card>
                   </Col>
                   <Col>
                     <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs">Max Drawdown</Text>
-                      <Metric className="text-rose-400 text-lg">{formatPct(result.maxDrawdown * 100)}</Metric>
+                      <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.maxDrawdown")}</Text>
+                      <Metric className="text-rose-400 text-lg">{formatPct(result.maxDrawdown * 100, 2, lang)}</Metric>
                     </Card>
                   </Col>
                   <Col>
                     <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs">Sharpe Ratio</Text>
+                      <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.sharpe")}</Text>
                       <Metric className="text-tremor-brand dark:text-emerald-400 text-lg">{result.sharpe.toFixed(2)}</Metric>
                     </Card>
                   </Col>
@@ -1566,19 +1572,19 @@ export default function PortfolioAllocator(): JSX.Element {
                     <>
                       <Col>
                         <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                          <Text className="text-tremor-content dark:text-slate-400 text-xs">Emprunt (marge)</Text>
-                          <Metric className="text-amber-400 text-lg">{formatEUR(result.loanAmount)}</Metric>
+                          <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.loan")}</Text>
+                          <Metric className="text-amber-400 text-lg">{formatEUR(result.loanAmount, lang)}</Metric>
                         </Card>
                       </Col>
                       <Col>
                         <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                          <Text className="text-tremor-content dark:text-slate-400 text-xs">Intérêts payés</Text>
-                          <Metric className="text-amber-400 text-lg">{formatEUR(result.totalInterestPaid)}</Metric>
+                          <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.interestPaid")}</Text>
+                          <Metric className="text-amber-400 text-lg">{formatEUR(result.totalInterestPaid, lang)}</Metric>
                         </Card>
                       </Col>
                       <Col>
                         <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                          <Text className="text-tremor-content dark:text-slate-400 text-xs">Levier appliqué</Text>
+                          <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.leverage")}</Text>
                           <Metric className="text-amber-400 text-lg">{result.marginLeverage.toFixed(2)}×</Metric>
                         </Card>
                       </Col>
@@ -1589,14 +1595,14 @@ export default function PortfolioAllocator(): JSX.Element {
                 {/* Charts */}
                 <TabGroup defaultIndex={0}>
                   <TabList className="bg-slate-800/50 border-slate-700/50">
-                    <Tab className="text-slate-400 data-[selected]:text-emerald-400 data-[selected]:border-b-emerald-400">Performance</Tab>
-                    <Tab className="text-slate-400 data-[selected]:text-emerald-400 data-[selected]:border-b-emerald-400">Drawdown</Tab>
-                    <Tab className="text-slate-400 data-[selected]:text-emerald-400 data-[selected]:border-b-emerald-400">Allocation</Tab>
+                    <Tab className="text-slate-400 data-[selected]:text-emerald-400 data-[selected]:border-b-emerald-400">{t("alloc.chart.performance")}</Tab>
+                    <Tab className="text-slate-400 data-[selected]:text-emerald-400 data-[selected]:border-b-emerald-400">{t("alloc.chart.drawdown")}</Tab>
+                    <Tab className="text-slate-400 data-[selected]:text-emerald-400 data-[selected]:border-b-emerald-400">{t("alloc.chart.allocation")}</Tab>
                   </TabList>
                   <TabPanels>
                     <TabPanel>
                       <div className="mt-4">
-                        <Text className="text-tremor-content dark:text-slate-400 text-sm mb-2">Évolution du portefeuille</Text>
+                        <Text className="text-tremor-content dark:text-slate-400 text-sm mb-2">{t("alloc.chart.portfolioEvolution")}</Text>
                         <ResponsiveContainer width="100%" height={320}>
                           <ComposedChart data={portfolioChartData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
@@ -1610,7 +1616,7 @@ export default function PortfolioAllocator(): JSX.Element {
                             />
                             <YAxis
                               tick={{ fill: "#94a3b8", fontSize: 12 }}
-                              tickFormatter={(v: number) => formatCompactEUR(v)}
+                              tickFormatter={(v: number) => formatCompactEUR(v, lang)}
                               width={80}
                             />
                             <Tooltip content={<CustomTooltip />} />
@@ -1681,30 +1687,30 @@ export default function PortfolioAllocator(): JSX.Element {
                             <>
                               <div className="flex items-center gap-1.5">
                                 <span className="w-3 h-1 rounded-full bg-emerald-400" />
-                                <Text className="text-tremor-content dark:text-slate-400 text-xs">Valeur nette (equity)</Text>
+                                <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.chart.equityLabel")}</Text>
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <span className="w-3 h-1 rounded-full bg-slate-400" />
-                                <Text className="text-tremor-content dark:text-slate-400 text-xs">Valeur brute (assets)</Text>
+                                <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.chart.assetsLabel")}</Text>
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <span className="w-3 h-0.5 rounded-full bg-rose-400" style={{ borderTop: "2px dashed #f87171" }} />
-                                <Text className="text-tremor-content dark:text-slate-400 text-xs">Emprunt</Text>
+                                <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.chart.loan")}</Text>
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <span className="w-3 h-0.5 rounded-full bg-slate-500" style={{ borderTop: "2px dashed #64748b" }} />
-                                <Text className="text-tremor-content dark:text-slate-400 text-xs">Total investi</Text>
+                                <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.chart.invested")}</Text>
                               </div>
                             </>
                           ) : (
                             <>
                               <div className="flex items-center gap-1.5">
                                 <span className="w-3 h-1 rounded-full bg-emerald-400" />
-                                <Text className="text-tremor-content dark:text-slate-400 text-xs">Valeur du portefeuille</Text>
+                                <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.chart.valuePortfolio")}</Text>
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <span className="w-3 h-0.5 rounded-full bg-slate-500" style={{ borderTop: "2px dashed #64748b" }} />
-                                <Text className="text-tremor-content dark:text-slate-400 text-xs">Total investi</Text>
+                                <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.chart.invested")}</Text>
                               </div>
                             </>
                           )}
@@ -1714,7 +1720,7 @@ export default function PortfolioAllocator(): JSX.Element {
 
                     <TabPanel>
                       <div className="mt-4">
-                        <Text className="text-tremor-content dark:text-slate-400 text-sm mb-2">Drawdown au fil du temps</Text>
+                        <Text className="text-tremor-content dark:text-slate-400 text-sm mb-2">{t("alloc.chart.drawdownOverTime")}</Text>
                         <ResponsiveContainer width="100%" height={320}>
                           <ComposedChart data={drawdownChartData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
@@ -1748,7 +1754,7 @@ export default function PortfolioAllocator(): JSX.Element {
 
                     <TabPanel>
                       <div className="mt-4">
-                        <Text className="text-tremor-content dark:text-slate-400 text-sm mb-2">Allocation cible par actif</Text>
+                        <Text className="text-tremor-content dark:text-slate-400 text-sm mb-2">{t("alloc.chart.allocationByAsset")}</Text>
                         <ResponsiveContainer width="100%" height={320}>
                           <BarChart data={allocationChartData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
@@ -1776,5 +1782,13 @@ export default function PortfolioAllocator(): JSX.Element {
         </Col>
       </Grid>
     </div>
+  );
+}
+
+export default function PortfolioAllocator(): JSX.Element {
+  return (
+    <I18nProvider>
+      <PortfolioAllocatorInner />
+    </I18nProvider>
   );
 }
