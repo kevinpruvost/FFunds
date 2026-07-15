@@ -33,8 +33,10 @@ function applyLang(lang: Lang) {
   const toggleLabel = document.getElementById("lang-toggle-label");
   const toggleFlag = document.getElementById("lang-toggle-flag");
   const toggle = document.getElementById("lang-toggle");
-  if (toggleLabel) toggleLabel.textContent = lang === "fr" ? "EN" : "FR";
-  if (toggleFlag) toggleFlag.textContent = lang === "fr" ? "🇫🇷" : "🇬🇧";
+  // Show the TARGET language (what clicking will switch to)
+  const targetLang = lang === "fr" ? "en" : "fr";
+  if (toggleLabel) toggleLabel.textContent = targetLang === "fr" ? "FR" : "EN";
+  if (toggleFlag) toggleFlag.textContent = targetLang === "fr" ? "🇫🇷" : "🇬🇧";
   if (toggle) toggle.setAttribute("aria-label", lang === "fr" ? "Switch to English" : "Passer au français");
 }
 

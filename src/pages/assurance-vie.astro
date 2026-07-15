@@ -1,0 +1,197 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { readLang } from '../i18n/astro-i18n';
+import { TRANSLATIONS } from '../i18n/translations';
+
+const lang = readLang();
+const T = TRANSLATIONS[lang];
+const isFr = lang === 'fr';
+---
+
+<BaseLayout title={T["av.title"]} description={T["av.subtitle"]}>
+
+<div class="mb-8">
+  <h1 class="text-2xl font-bold text-slate-50" data-i18n="av.title">{T["av.title"]}</h1>
+  <p class="mt-1 text-sm text-slate-400" data-i18n="av.subtitle">{T["av.subtitle"]}</p>
+</div>
+
+<div class="max-w-4xl space-y-10">
+
+  <!-- ─── What is AV ─── -->
+  <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-6">
+    <h2 class="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-100" data-i18n="av.what.title">
+      <svg class="h-5 w-5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      {T["av.what.title"]}
+    </h2>
+    <p class="mb-3 text-sm text-slate-400 leading-relaxed" data-i18n="av.what.p1">{T["av.what.p1"]}</p>
+    <p class="text-sm text-slate-400 leading-relaxed" data-i18n="av.what.p2">{T["av.what.p2"]}</p>
+  </section>
+
+  <!-- ─── Why it's a trap ─── -->
+  <section class="rounded-xl border border-red-900/40 bg-red-950/20 p-6">
+    <h2 class="mb-4 flex items-center gap-2 text-lg font-semibold text-red-300" data-i18n="av.trap.title">
+      <svg class="h-5 w-5 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+      </svg>
+      {T["av.trap.title"]}
+    </h2>
+    <ul class="space-y-3 text-sm text-slate-400">
+      <li class="flex gap-3">
+        <span class="mt-0.5 shrink-0 text-red-400 font-bold">⚠</span>
+        <span data-i18n="av.trap.fees">{T["av.trap.fees"]}</span>
+      </li>
+      <li class="flex gap-3">
+        <span class="mt-0.5 shrink-0 text-amber-400 font-bold">⚠</span>
+        <span data-i18n="av.trap.fondsEuro">{T["av.trap.fondsEuro"]}</span>
+      </li>
+      <li class="flex gap-3">
+        <span class="mt-0.5 shrink-0 text-amber-400 font-bold">⚠</span>
+        <span data-i18n="av.trap.complexity">{T["av.trap.complexity"]}</span>
+      </li>
+      <li class="flex gap-3">
+        <span class="mt-0.5 shrink-0 text-amber-400 font-bold">⚠</span>
+        <span data-i18n="av.trap.lockin">{T["av.trap.lockin"]}</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- ─── Best contracts (table) ─── -->
+  <section>
+    <h2 class="mb-3 text-lg font-semibold text-slate-100" data-i18n="av.best.title">{T["av.best.title"]}</h2>
+    <p class="mb-5 text-xs text-amber-400/80 bg-amber-500/5 border border-amber-500/20 rounded-lg p-3 leading-relaxed" data-i18n="av.best.note">{T["av.best.note"]}</p>
+
+    <div class="overflow-x-auto rounded-xl border border-slate-800">
+      <table class="w-full text-left text-xs">
+        <thead>
+          <tr class="border-b border-slate-700 bg-slate-900/60">
+            <th class="px-4 py-3 font-semibold text-slate-300 whitespace-nowrap">{isFr ? 'Contrat' : 'Contract'}</th>
+            <th class="px-4 py-3 font-semibold text-slate-300 whitespace-nowrap">{isFr ? 'Min.' : 'Min.'}</th>
+            <th class="px-4 py-3 font-semibold text-slate-300 whitespace-nowrap">{isFr ? 'Frais entrée' : 'Entry fees'}</th>
+            <th class="px-4 py-3 font-semibold text-slate-300 whitespace-nowrap">{isFr ? 'Frais gestion UC' : 'UC mgmt fees'}</th>
+            <th class="px-4 py-3 font-semibold text-slate-300 whitespace-nowrap">{isFr ? 'Fonds euro' : 'Euro fund'}</th>
+            <th class="px-4 py-3 font-semibold text-slate-300 whitespace-nowrap">{isFr ? 'Atouts' : 'Highlights'}</th>
+            <th class="px-4 py-3 w-10"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-2.5 font-medium text-slate-100 whitespace-nowrap" data-i18n="av.best.linxea.name">{T["av.best.linxea.name"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 tabular-nums">200 €</td>
+            <td class="px-4 py-2.5 text-emerald-400 font-medium">0 %</td>
+            <td class="px-4 py-2.5 text-slate-400 tabular-nums">0,50 %</td>
+            <td class="px-4 py-2.5 text-slate-400">Opportunités</td>
+            <td class="px-4 py-2.5 text-slate-500">{isFr ? 'ETF, SCPI, OPCVM' : 'ETFs, SCPIs, funds'}</td>
+            <td class="px-4 py-2.5 text-right">
+              <a href={T["av.best.linxea.link"]} target="_blank" rel="noopener noreferrer"
+                 class="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/50 px-2 py-1 text-xs font-medium text-slate-300 transition-all hover:border-emerald-500/40 hover:text-emerald-300">
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                <span>→</span>
+              </a>
+            </td>
+          </tr>
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-2.5 font-medium text-slate-100 whitespace-nowrap" data-i18n="av.best.spirit.name">{T["av.best.spirit.name"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 tabular-nums">-</td>
+            <td class="px-4 py-2.5 text-emerald-400 font-medium">0 %</td>
+            <td class="px-4 py-2.5 text-slate-400 tabular-nums">0,50 %</td>
+            <td class="px-4 py-2.5 text-slate-400">-</td>
+            <td class="px-4 py-2.5 text-slate-500">{isFr ? 'PE, SCI, structurés' : 'PE, SCI, structured'}</td>
+            <td class="px-4 py-2.5 text-right">
+              <a href={T["av.best.spirit.link"]} target="_blank" rel="noopener noreferrer"
+                 class="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/50 px-2 py-1 text-xs font-medium text-slate-300 transition-all hover:border-emerald-500/40 hover:text-emerald-300">
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                <span>→</span>
+              </a>
+            </td>
+          </tr>
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-2.5 font-medium text-slate-100 whitespace-nowrap" data-i18n="av.best.lucya.name">{T["av.best.lucya.name"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 tabular-nums">-</td>
+            <td class="px-4 py-2.5 text-emerald-400 font-medium">0 %</td>
+            <td class="px-4 py-2.5 text-slate-400 tabular-nums">0,50 %</td>
+            <td class="px-4 py-2.5 text-slate-400">Cardif</td>
+            <td class="px-4 py-2.5 text-slate-500">{isFr ? 'ETF, SCPI, FCPR' : 'ETFs, SCPIs, FCPR'}</td>
+            <td class="px-4 py-2.5 text-right">
+              <a href={T["av.best.lucya.link"]} target="_blank" rel="noopener noreferrer"
+                 class="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/50 px-2 py-1 text-xs font-medium text-slate-300 transition-all hover:border-emerald-500/40 hover:text-emerald-300">
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                <span>→</span>
+              </a>
+            </td>
+          </tr>
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-2.5 font-medium text-slate-100 whitespace-nowrap" data-i18n="av.best.bourso.name">{T["av.best.bourso.name"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 tabular-nums">-</td>
+            <td class="px-4 py-2.5 text-emerald-400 font-medium">0 %</td>
+            <td class="px-4 py-2.5 text-slate-400 tabular-nums">0,50 %</td>
+            <td class="px-4 py-2.5 text-emerald-600/80 tabular-nums">2,30 %</td>
+            <td class="px-4 py-2.5 text-slate-500">{isFr ? 'Simple, intégré CB' : 'Simple, bank-integrated'}</td>
+            <td class="px-4 py-2.5 text-right">
+              <a href={T["av.best.bourso.link"]} target="_blank" rel="noopener noreferrer"
+                 class="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/50 px-2 py-1 text-xs font-medium text-slate-300 transition-all hover:border-emerald-500/40 hover:text-emerald-300">
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                <span>→</span>
+              </a>
+            </td>
+          </tr>
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-2.5 font-medium text-slate-100 whitespace-nowrap" data-i18n="av.best.fortuneo.name">{T["av.best.fortuneo.name"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 tabular-nums">-</td>
+            <td class="px-4 py-2.5 text-emerald-400 font-medium">0 %</td>
+            <td class="px-4 py-2.5 text-slate-400 tabular-nums">0,50 %</td>
+            <td class="px-4 py-2.5 text-emerald-600/80 tabular-nums">2,60 %</td>
+            <td class="px-4 py-2.5 text-slate-500">{isFr ? '800+ supports, 130 ETF' : '800+ funds, 130 ETFs'}</td>
+            <td class="px-4 py-2.5 text-right">
+              <a href={T["av.best.fortuneo.link"]} target="_blank" rel="noopener noreferrer"
+                 class="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/50 px-2 py-1 text-xs font-medium text-slate-300 transition-all hover:border-emerald-500/40 hover:text-emerald-300">
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                <span>→</span>
+              </a>
+            </td>
+          </tr>
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-2.5 font-medium text-slate-100 whitespace-nowrap" data-i18n="av.best.yomoni.name">{T["av.best.yomoni.name"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 tabular-nums">-</td>
+            <td class="px-4 py-2.5 text-emerald-400 font-medium">0 %</td>
+            <td class="px-4 py-2.5 text-amber-400 tabular-nums">0,95–1,75 %</td>
+            <td class="px-4 py-2.5 text-slate-400">-</td>
+            <td class="px-4 py-2.5 text-slate-500">{isFr ? 'Gestion pilotée ETF' : 'Managed ETF portfolio'}</td>
+            <td class="px-4 py-2.5 text-right">
+              <a href={T["av.best.yomoni.link"]} target="_blank" rel="noopener noreferrer"
+                 class="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/50 px-2 py-1 text-xs font-medium text-slate-300 transition-all hover:border-emerald-500/40 hover:text-emerald-300">
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                <span>→</span>
+              </a>
+            </td>
+          </tr>
+          <tr class="hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-2.5 font-medium text-slate-100 whitespace-nowrap" data-i18n="av.best.nalo.name">{T["av.best.nalo.name"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 tabular-nums">-</td>
+            <td class="px-4 py-2.5 text-emerald-400 font-medium">0 %</td>
+            <td class="px-4 py-2.5 text-amber-400 tabular-nums">dès 1,05 %</td>
+            <td class="px-4 py-2.5 text-slate-400">-</td>
+            <td class="px-4 py-2.5 text-slate-500">{isFr ? 'ISR/ESG, responsable' : 'ISR/ESG, responsible'}</td>
+            <td class="px-4 py-2.5 text-right">
+              <a href={T["av.best.nalo.link"]} target="_blank" rel="noopener noreferrer"
+                 class="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/50 px-2 py-1 text-xs font-medium text-slate-300 transition-all hover:border-emerald-500/40 hover:text-emerald-300">
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                <span>→</span>
+              </a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ─── Summary ─── -->
+  <section class="rounded-xl border border-emerald-800/40 bg-emerald-950/20 p-6">
+    <h2 class="mb-3 text-lg font-semibold text-emerald-300" data-i18n="av.summary.title">{T["av.summary.title"]}</h2>
+    <p class="text-sm text-slate-400 leading-relaxed" data-i18n="av.summary.p">{T["av.summary.p"]}</p>
+  </section>
+
+</div>
+
+</BaseLayout>

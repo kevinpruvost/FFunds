@@ -1,0 +1,875 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { readLang } from '../i18n/astro-i18n';
+import { TRANSLATIONS } from '../i18n/translations';
+
+const lang = readLang();
+const T = TRANSLATIONS[lang];
+const isFr = lang === 'fr';
+
+type ProviderType = "insurer" | "distributor" | "white-label" | "not-found" | "lps";
+
+interface Provider {
+  name: string;
+  nameKey: string;
+  descKey: string;
+  contactKey: string;
+  minInvestment: string;       // display value e.g. "100 000 €"
+  minInvestmentVal: number;    // sortable: min value in EUR, Infinity for "HNWI"/"Sur devis"
+  mgmtFees: string;            // display e.g. "0,80 % – 1,20 %"
+  mgmtFeesVal: number;         // sortable: lower bound %, NaN for "Sur devis"
+  entryFees: string;           // display e.g. "0 % – 2 %"
+  entryFeesVal: number;        // sortable: lower bound %, NaN for "Sur devis"
+  supports: string;
+  rating: string;
+  type: ProviderType;
+  isCaaRegistered: boolean;
+  solvencyRatio: string;       // display e.g. "226 %", "A+", "N/C"
+  solvencyVal: number;         // sortable: numeric %, -1 for non-numeric ratings
+  totalAssets: string;         // display e.g. "> 20 Mds€", "N/C"
+  assetsVal: number;           // sortable: value in millions €, -1 for N/C
+  establishedYear: string;     // display e.g. "1995", "N/C"
+  yearVal: number;             // sortable: year as number, -1 for N/C
+}
+
+const typeLabel = (t: ProviderType): string => {
+  if (isFr) {
+    switch (t) {
+      case "insurer": return "Assureur lux. CAA";
+      case "distributor": return "Distributeur CGPI";
+      case "white-label": return "Marque blanche";
+      case "lps": return "LPS (assureur étranger)";
+      case "not-found": return "Non trouvé registre CAA";
+    }
+  }
+  switch (t) {
+    case "insurer": return "LU insurer (CAA)";
+    case "distributor": return "Distributor/advisor";
+    case "white-label": return "White-label";
+    case "lps": return "LPS (foreign insurer)";
+    case "not-found": return "Not in CAA registry";
+  }
+};
+
+const typeBadgeColor = (t: ProviderType): string => {
+  switch (t) {
+    case "insurer": return "border-emerald-700/30 text-emerald-400 bg-emerald-500/10";
+    case "distributor": return "border-amber-700/30 text-amber-400 bg-amber-500/10";
+    case "white-label": return "border-blue-700/30 text-blue-400 bg-blue-500/10";
+    case "lps": return "border-purple-700/30 text-purple-400 bg-purple-500/10";
+    case "not-found": return "border-red-700/30 text-red-400 bg-red-500/10";
+  }
+};
+
+const providers: Provider[] = [
+  // ─── Assureurs directs (CAA Luxembourg) ───
+  {
+    nameKey: "lux.provider.swisslife",
+    descKey: "lux.provider.swisslife.desc",
+    contactKey: "lux.provider.swisslife.contact",
+    name: "SwissLife Luxembourg",
+    minInvestment: "100 000 €",
+    minInvestmentVal: 100000,
+    mgmtFees: "0,80 % – 1,20 %",
+    mgmtFeesVal: 0.80,
+    entryFees: "0 % – 2 %",
+    entryFeesVal: 0,
+    supports: "Fonds euro Lux, ETF, SCPI, PE",
+    rating: "★★★★☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "196 %",
+    solvencyVal: 196,
+    totalAssets: "16,5 Mds€",
+    assetsVal: 16500,
+    establishedYear: "1985",
+    yearVal: 1985,
+  },
+  {
+    nameKey: "lux.provider.lombardi",
+    descKey: "lux.provider.lombardi.desc",
+    contactKey: "lux.provider.lombardi.contact",
+    name: "Utmost Luxembourg (ex-Lombard)",
+    minInvestment: "250 000 €",
+    minInvestmentVal: 250000,
+    mgmtFees: "0,90 % – 1,50 %",
+    mgmtFeesVal: 0.90,
+    entryFees: "0 % – 3 %",
+    entryFeesVal: 0,
+    supports: "Sur-mesure UHNWI, PE, institutionnel",
+    rating: "★★★★☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "141 %",
+    solvencyVal: 141,
+    totalAssets: "53,6 Mds€",
+    assetsVal: 53600,
+    establishedYear: "1993",
+    yearVal: 1993,
+  },
+  {
+    nameKey: "lux.provider.cardif",
+    descKey: "lux.provider.cardif.desc",
+    contactKey: "lux.provider.cardif.contact",
+    name: "Cardif Lux Vie (BNP Paribas)",
+    minInvestment: "100 000 €",
+    minInvestmentVal: 100000,
+    mgmtFees: "0,70 % – 1,00 %",
+    mgmtFeesVal: 0.70,
+    entryFees: "0 % – 2 %",
+    entryFeesVal: 0,
+    supports: "Fonds internes, ETF large, SCPI",
+    rating: "★★★★☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "152 %",
+    solvencyVal: 152,
+    totalAssets: "35 Mds€",
+    assetsVal: 35000,
+    establishedYear: "1994",
+    yearVal: 1994,
+  },
+  {
+    nameKey: "lux.provider.generali",
+    descKey: "lux.provider.generali.desc",
+    contactKey: "lux.provider.generali.contact",
+    name: "Generali Luxembourg",
+    minInvestment: "50 000 €",
+    minInvestmentVal: 50000,
+    mgmtFees: "0,75 % – 1,10 %",
+    mgmtFeesVal: 0.75,
+    entryFees: "0 % – 2 %",
+    entryFeesVal: 0,
+    supports: "Multi-supports, ETF, fonds internes",
+    rating: "★★★★☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "150 %",
+    solvencyVal: 150,
+    totalAssets: "6,8 Mds€",
+    assetsVal: 6800,
+    establishedYear: "2011",
+    yearVal: 2011,
+  },
+  {
+    nameKey: "lux.provider.allianz",
+    descKey: "lux.provider.allianz.desc",
+    contactKey: "lux.provider.allianz.contact",
+    name: "Allianz Life Luxembourg",
+    minInvestment: "75 000 €",
+    minInvestmentVal: 75000,
+    mgmtFees: "0,80 % – 1,30 %",
+    mgmtFeesVal: 0.80,
+    entryFees: "0 % – 2,5 %",
+    entryFeesVal: 0,
+    supports: "Multi-supports, fonds euro, ETF",
+    rating: "★★★☆☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "145 %",
+    solvencyVal: 145,
+    totalAssets: "5,6 Mds€",
+    assetsVal: 5600,
+    establishedYear: "1991",
+    yearVal: 1991,
+  },
+  {
+    nameKey: "lux.provider.vitis",
+    descKey: "lux.provider.vitis.desc",
+    contactKey: "lux.provider.vitis.contact",
+    name: "Vitis Life Luxembourg",
+    minInvestment: "100 000 €",
+    minInvestmentVal: 100000,
+    mgmtFees: "0,50 % – 0,80 %",
+    mgmtFeesVal: 0.50,
+    entryFees: "0 %",
+    entryFeesVal: 0,
+    supports: "ETF, fonds institutionnels, plateforme en ligne",
+    rating: "★★★★★",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "206 %",
+    solvencyVal: 206,
+    totalAssets: "~4 Mds€",
+    assetsVal: 4000,
+    establishedYear: "1995",
+    yearVal: 1995,
+  },
+  {
+    nameKey: "lux.provider.onelife",
+    descKey: "lux.provider.onelife.desc",
+    contactKey: "lux.provider.onelife.contact",
+    name: "OneLife (APICIL)",
+    minInvestment: "50 000 €",
+    minInvestmentVal: 50000,
+    mgmtFees: "0,75 % – 1,25 %",
+    mgmtFeesVal: 0.75,
+    entryFees: "0 %",
+    entryFeesVal: 0,
+    supports: "Fonds inst., PE, ETF, plateforme youroffice",
+    rating: "★★★★☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "141 %",
+    solvencyVal: 141,
+    totalAssets: "10,8 Mds€",
+    assetsVal: 10800,
+    establishedYear: "1991",
+    yearVal: 1991,
+  },
+  {
+    nameKey: "lux.provider.wealins",
+    descKey: "lux.provider.wealins.desc",
+    contactKey: "lux.provider.wealins.contact",
+    name: "Wealins (Foyer/Helvetia)",
+    minInvestment: "250 000 €",
+    minInvestmentVal: 250000,
+    mgmtFees: "0,70 % – 1,10 %",
+    mgmtFeesVal: 0.70,
+    entryFees: "0 %",
+    entryFeesVal: 0,
+    supports: "100 % UC, 11 pays, e-Wealins",
+    rating: "★★★★☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "157 %",
+    solvencyVal: 157,
+    totalAssets: "18,2 Mds€",
+    assetsVal: 18200,
+    establishedYear: "1992",
+    yearVal: 1992,
+  },
+  {
+    nameKey: "lux.provider.baloise",
+    descKey: "lux.provider.baloise.desc",
+    contactKey: "lux.provider.baloise.contact",
+    name: "Bâloise Vie Luxembourg",
+    minInvestment: "100 000 €",
+    minInvestmentVal: 100000,
+    mgmtFees: "0,60 % – 1,00 %",
+    mgmtFeesVal: 0.60,
+    entryFees: "0 %",
+    entryFeesVal: 0,
+    supports: "Profolio, ProCapi, ETF, SCPI",
+    rating: "★★★★☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "145 %",
+    solvencyVal: 145,
+    totalAssets: "12 Mds€",
+    assetsVal: 12000,
+    establishedYear: "1996",
+    yearVal: 1996,
+  },
+  {
+    nameKey: "lux.provider.sogelife",
+    descKey: "lux.provider.sogelife.desc",
+    contactKey: "lux.provider.sogelife.contact",
+    name: "Sogelife (SG Assurances)",
+    minInvestment: "250 000 €",
+    minInvestmentVal: 250000,
+    mgmtFees: "0,60 % – 0,90 %",
+    mgmtFeesVal: 0.60,
+    entryFees: "0 %",
+    entryFeesVal: 0,
+    supports: "Target+ LUX Vie, multi-devises, fonds euro",
+    rating: "★★★★☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "146 %",
+    solvencyVal: 146,
+    totalAssets: "15,5 Mds€",
+    assetsVal: 15500,
+    establishedYear: "1996",
+    yearVal: 1996,
+  },
+  {
+    nameKey: "lux.provider.axaWealth",
+    descKey: "lux.provider.axaWealth.desc",
+    contactKey: "lux.provider.axaWealth.contact",
+    name: "AXA Wealth Europe",
+    minInvestment: "125 000 €",
+    minInvestmentVal: 125000,
+    mgmtFees: "0,70 % – 1,10 %",
+    mgmtFeesVal: 0.70,
+    entryFees: "0 % – 2 %",
+    entryFeesVal: 0,
+    supports: "Lifinity Europe, multi-devises, fonds euro",
+    rating: "★★★★☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "143 %",
+    solvencyVal: 143,
+    totalAssets: "2 Mds€",
+    assetsVal: 2000,
+    establishedYear: "2016",
+    yearVal: 2016,
+  },
+  {
+    nameKey: "lux.provider.cali",
+    descKey: "lux.provider.cali.desc",
+    contactKey: "lux.provider.cali.contact",
+    name: "CALI Europe (Crédit Agricole)",
+    minInvestment: "300 000 €",
+    minInvestmentVal: 300000,
+    mgmtFees: "0,60 % – 0,90 %",
+    mgmtFeesVal: 0.60,
+    entryFees: "0 %",
+    entryFeesVal: 0,
+    supports: "CALI Lux, FP Euro2, multi-devises",
+    rating: "★★★★☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "148 %",
+    solvencyVal: 148,
+    totalAssets: "14,3 Mds€",
+    assetsVal: 14300,
+    establishedYear: "1998",
+    yearVal: 1998,
+  },
+  {
+    nameKey: "lux.provider.bpce",
+    descKey: "lux.provider.bpce.desc",
+    contactKey: "lux.provider.bpce.contact",
+    name: "BPCE Life (Natixis Assur.)",
+    minInvestment: "75 000 €",
+    minInvestmentVal: 75000,
+    mgmtFees: "0,60 % – 1,00 %",
+    mgmtFeesVal: 0.60,
+    entryFees: "0 %",
+    entryFeesVal: 0,
+    supports: "Premium Vie, Millevie Lux, multi-devises",
+    rating: "★★★★☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "168 %",
+    solvencyVal: 168,
+    totalAssets: "11,3 Mds€",
+    assetsVal: 11300,
+    establishedYear: "1997",
+    yearVal: 1997,
+  },
+  {
+    nameKey: "lux.provider.cnp",
+    descKey: "lux.provider.cnp.desc",
+    contactKey: "lux.provider.cnp.contact",
+    name: "CNP Luxembourg (One Lux)",
+    minInvestment: "500 000 €",
+    minInvestmentVal: 500000,
+    mgmtFees: "Sur devis",
+    mgmtFeesVal: 999999,
+    entryFees: "Sur devis",
+    entryFeesVal: 999999,
+    supports: "355 supports, HNWI",
+    rating: "★★★★☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "183 %",
+    solvencyVal: 183,
+    totalAssets: "7,2 Mds€",
+    assetsVal: 7200,
+    establishedYear: "2015",
+    yearVal: 2015,
+  },
+  {
+    nameKey: "lux.provider.afiesca",
+    descKey: "lux.provider.afiesca.desc",
+    contactKey: "lux.provider.afiesca.contact",
+    name: "AFI.ESCA Luxembourg",
+    minInvestment: "100 000 €+",
+    minInvestmentVal: 100000,
+    mgmtFees: "0,70 % – 1,10 %",
+    mgmtFeesVal: 0.70,
+    entryFees: "0 % – 2 %",
+    entryFeesVal: 0,
+    supports: "Quality Life, 35+ pays",
+    rating: "★★★☆☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "126 %",
+    solvencyVal: 126,
+    totalAssets: "1,3 Mds€",
+    assetsVal: 1300,
+    establishedYear: "2013",
+    yearVal: 2013,
+  },
+  {
+    nameKey: "lux.provider.foyer",
+    descKey: "lux.provider.foyer.desc",
+    contactKey: "lux.provider.foyer.contact",
+    name: "Foyer Vie (Groupe Foyer)",
+    minInvestment: "1 000 €",
+    minInvestmentVal: 1000,
+    mgmtFees: "0,60 % – 1,00 %",
+    mgmtFeesVal: 0.60,
+    entryFees: "0 %",
+    entryFeesVal: 0,
+    supports: "smartlife, invest4change, Helios",
+    rating: "★★★★☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "227 %",
+    solvencyVal: 227,
+    totalAssets: "2,9 Mds€",
+    assetsVal: 2900,
+    establishedYear: "1990",
+    yearVal: 1990,
+  },
+  {
+    nameKey: "lux.provider.lalux",
+    descKey: "lux.provider.lalux.desc",
+    contactKey: "lux.provider.lalux.contact",
+    name: "La Luxembourgeoise-Vie (LALUX)",
+    minInvestment: "1 000 €",
+    minInvestmentVal: 1000,
+    mgmtFees: "0,60 % – 1,00 %",
+    mgmtFeesVal: 0.60,
+    entryFees: "0 %",
+    entryFeesVal: 0,
+    supports: "easyLIFE Mixte, Invest for Future, Prévoyance",
+    rating: "★★★★☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "188 %",
+    solvencyVal: 188,
+    totalAssets: "2,4 Mds€",
+    assetsVal: 2400,
+    establishedYear: "1920 (CAA)",
+    yearVal: 1920,
+  },
+  {
+    nameKey: "lux.provider.monument",
+    descKey: "lux.provider.monument.desc",
+    contactKey: "lux.provider.monument.contact",
+    name: "Monument Assurance Lux.",
+    minInvestment: "HNWI",
+    minInvestmentVal: 999999,
+    mgmtFees: "Sur devis",
+    mgmtFeesVal: 999999,
+    entryFees: "Sur devis",
+    entryFeesVal: 999999,
+    supports: "Vie + capitalisation HNWI",
+    rating: "★★★☆☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "347 %",
+    solvencyVal: 347,
+    totalAssets: "N/C (run-off)",
+    assetsVal: 0,
+    establishedYear: "2000",
+    yearVal: 2000,
+  },
+
+
+  // ─── Marque blanche ───
+  {
+    nameKey: "lux.provider.boursoVieLux",
+    descKey: "lux.provider.boursoVieLux.desc",
+    contactKey: "lux.provider.boursoVieLux.contact",
+    name: "BoursoVie Lux (Sogelife)",
+    minInvestment: "150 000 €",
+    minInvestmentVal: 150000,
+    mgmtFees: "0,60 % – 0,90 %",
+    mgmtFeesVal: 0.60,
+    entryFees: "0 %",
+    entryFeesVal: 0,
+    supports: "Fonds euro + ETF, 100 % digital",
+    rating: "★★★★★",
+    type: "white-label",
+    isCaaRegistered: false,
+    solvencyRatio: "146 %",
+    solvencyVal: 146,
+    totalAssets: "15,5 Mds€",
+    assetsVal: 15500,
+    establishedYear: "2021 (Sogelife: 1996)",
+    yearVal: 2021,
+  },
+
+
+  // ─── La Mondiale Europartner ───
+  {
+    nameKey: "lux.provider.laMondiale",
+    descKey: "lux.provider.laMondiale.desc",
+    contactKey: "lux.provider.laMondiale.contact",
+    name: "La Mondiale Europartner",
+    minInvestment: "100 000 €",
+    minInvestmentVal: 100000,
+    mgmtFees: "0,75 % – 1,10 %",
+    mgmtFeesVal: 0.75,
+    entryFees: "0 %",
+    entryFeesVal: 0,
+    supports: "Life Mobility Evolution, fonds euro, ETF, SCPI, PE, multi-devises",
+    rating: "★★★★☆",
+    type: "insurer",
+    isCaaRegistered: true,
+    solvencyRatio: "180 %",
+    solvencyVal: 180,
+    totalAssets: "21,3 Mds€",
+    assetsVal: 21300,
+    establishedYear: "1987",
+    yearVal: 1987,
+  },
+];
+
+const feeDetails: Record<string, { switchFees: string; exitFees: string; structFees: string; ucFees: string; euroFees: string }> = {
+  "SwissLife Luxembourg": { switchFees: "15 €", exitFees: "0 %", structFees: "0,20 %", ucFees: "0,80 %", euroFees: "0,75 %" },
+  "Generali Luxembourg": { switchFees: "25 €", exitFees: "0 %", structFees: "0,15 %", ucFees: "0,75 %", euroFees: "0,70 %" },
+  "Utmost Luxembourg (ex-Lombard)": { switchFees: "50–100 €", exitFees: "0 %", structFees: "0,25 %", ucFees: "0,90 %", euroFees: "0,85 %" },
+  "Cardif Lux Vie (BNP Paribas)": { switchFees: "Gratuits", exitFees: "0 %", structFees: "0,15 %", ucFees: "0,70 %", euroFees: "0,75 %" },
+  "Allianz Life Luxembourg": { switchFees: "30 €", exitFees: "0 %", structFees: "0,20 %", ucFees: "0,80 %", euroFees: "0,75 %" },
+  "Vitis Life Luxembourg": { switchFees: "Gratuits", exitFees: "0 %", structFees: "0,10 %", ucFees: "0,50 %", euroFees: "0,60 %" },
+  "OneLife (APICIL)": { switchFees: "Gratuits", exitFees: "0 %", structFees: "0,18 %", ucFees: "0,75 %", euroFees: "N/A (100% UC)" },
+  "Wealins (Foyer/Helvetia)": { switchFees: "Gratuits", exitFees: "0 %", structFees: "0,18 %", ucFees: "0,70 %", euroFees: "N/A (100% UC)" },
+  "Bâloise Vie Luxembourg": { switchFees: "Gratuits", exitFees: "0 %", structFees: "0,12 %", ucFees: "0,60 %", euroFees: "0,65 %" },
+  "Sogelife (SG Assurances)": { switchFees: "15 €", exitFees: "0 %", structFees: "0,12 %", ucFees: "0,60 %", euroFees: "0,65 %" },
+  "BoursoVie Lux (Sogelife)": { switchFees: "Gratuits", exitFees: "0 %", structFees: "0,12 %", ucFees: "0,60 %", euroFees: "0,65 %" },
+  "AXA Wealth Europe": { switchFees: "25 €", exitFees: "0 %", structFees: "0,15 %", ucFees: "0,70 %", euroFees: "0,75 %" },
+  "CALI Europe (Crédit Agricole)": { switchFees: "Gratuits", exitFees: "0 %", structFees: "0,12 %", ucFees: "0,60 %", euroFees: "0,70 %" },
+  "BPCE Life (Natixis Assur.)": { switchFees: "Gratuits", exitFees: "0 %", structFees: "0,15 %", ucFees: "0,60 %", euroFees: "0,65 %" },
+  "CNP Luxembourg (One Lux)": { switchFees: "Sur devis", exitFees: "0 %", structFees: "Sur devis", ucFees: "Sur devis", euroFees: "Sur devis" },
+  "AFI.ESCA Luxembourg": { switchFees: "20 €", exitFees: "0 %", structFees: "0,15 %", ucFees: "0,70 %", euroFees: "0,75 %" },
+  "Foyer Vie (Groupe Foyer)": { switchFees: "Gratuits", exitFees: "0 %", structFees: "0,15 %", ucFees: "0,70 %", euroFees: "0,75 %" },
+  "La Luxembourgeoise-Vie (LALUX)": { switchFees: "Gratuits", exitFees: "0 %", structFees: "0,12 %", ucFees: "0,60 %", euroFees: "0,65 %" },
+
+  "Monument Assurance Lux.": { switchFees: "N/C", exitFees: "N/C", structFees: "N/C", ucFees: "N/C", euroFees: "N/C" },
+  "La Mondiale Europartner": { switchFees: "Gratuits", exitFees: "0 %", structFees: "0,15 %", ucFees: "0,70 %", euroFees: "0,75 %" },
+};
+
+
+---
+
+<BaseLayout title={T["lux.title"]} description={T["lux.subtitle"]}>
+
+<div class="mb-8">
+  <h1 class="text-2xl font-bold text-slate-50" data-i18n="lux.title">{T["lux.title"]}</h1>
+  <p class="mt-1 text-sm text-slate-400" data-i18n="lux.subtitle">{T["lux.subtitle"]}</p>
+</div>
+
+<div class="max-w-5xl space-y-10">
+
+  <!-- ─── Why Luxembourg ─── -->
+  <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-6">
+    <h2 class="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-100" data-i18n="lux.why.title">
+      <svg class="h-5 w-5 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m0 0a9 9 0 019 9"/>
+      </svg>
+      {T["lux.why.title"]}
+    </h2>
+    <p class="mb-3 text-sm text-slate-400 leading-relaxed" data-i18n="lux.why.p1">{T["lux.why.p1"]}</p>
+    <p class="mb-3 text-sm text-slate-400 leading-relaxed" data-i18n="lux.why.p2">{T["lux.why.p2"]}</p>
+    <p class="text-sm text-amber-400 leading-relaxed" data-i18n="lux.why.p3">{T["lux.why.p3"]}</p>
+  </section>
+
+  <!-- ─── Comparison Table ─── -->
+  <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-6">
+    <h2 class="mb-1 text-lg font-semibold text-slate-100">
+      {isFr ? 'Tableau comparatif' : 'Comparison table'}
+    </h2>
+    <p class="mb-5 text-xs text-slate-500">
+      {isFr
+        ? 'Avantages, inconvénients et détails des frais pour chaque contrat luxembourgeois.'
+        : 'Benefits, disadvantages and detailed fees for each Luxembourg contract.'}
+    </p>
+
+    <!-- Scrollable table wrapper with sort controls -->
+    <div class="mb-3 flex items-center gap-2 text-xs text-slate-500">
+      <span data-i18n="lux.table.sortBy">{T["lux.table.sortBy"]}</span>
+      <span class="text-slate-600">·</span>
+    </div>
+
+    <div class="overflow-x-auto -mx-6 relative">
+      <table class="w-full text-left text-xs" id="lux-compare-table">
+        <thead>
+          <tr class="border-b border-slate-700">
+            <th class="sticky left-0 z-20 bg-slate-900 px-4 py-3 pr-6 text-xs font-semibold text-slate-300 whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.6)]" data-sort-key="name">{T["lux.table.contract"]}</th>
+            <th class="px-4 py-3 text-xs font-semibold text-slate-300 cursor-pointer hover:text-slate-100 select-none whitespace-nowrap" data-sort-key="min" data-sort-dir="">{T["lux.table.min"]} <span class="sort-arrow text-slate-600">↕</span></th>
+            <th class="px-4 py-3 text-xs font-semibold text-slate-300 cursor-pointer hover:text-slate-100 select-none whitespace-nowrap" data-sort-key="mgmt" data-sort-dir="">{T["lux.table.mgmtFees"]} <span class="sort-arrow text-slate-600">↕</span></th>
+            <th class="px-4 py-3 text-xs font-semibold text-slate-300 cursor-pointer hover:text-slate-100 select-none whitespace-nowrap" data-sort-key="entry" data-sort-dir="">{T["lux.table.entryFees"]} <span class="sort-arrow text-slate-600">↕</span></th>
+            <th class="px-4 py-3 text-xs font-semibold text-slate-300 cursor-pointer hover:text-slate-100 select-none whitespace-nowrap" data-sort-key="solvency" data-sort-dir="">{T["lux.table.solvency"]} <span class="sort-arrow text-slate-600">↕</span></th>
+            <th class="px-4 py-3 text-xs font-semibold text-slate-300 cursor-pointer hover:text-slate-100 select-none whitespace-nowrap" data-sort-key="assets" data-sort-dir="">{T["lux.table.assets"]} <span class="sort-arrow text-slate-600">↕</span></th>
+            <th class="px-4 py-3 text-xs font-semibold text-slate-300 cursor-pointer hover:text-slate-100 select-none whitespace-nowrap" data-sort-key="year" data-sort-dir="">{T["lux.table.seniority"]} <span class="sort-arrow text-slate-600">↕</span></th>
+            <th class="px-4 py-3 text-xs font-semibold text-slate-300 whitespace-nowrap">{T["lux.table.switchFees"]}</th>
+            <th class="px-4 py-3 text-xs font-semibold text-slate-300 whitespace-nowrap">{T["lux.table.exitFees"]}</th>
+            <th class="px-4 py-3 text-xs font-semibold text-slate-300 whitespace-nowrap">{T["lux.table.structFees"]}</th>
+            <th class="px-4 py-3 text-xs font-semibold text-slate-300 whitespace-nowrap">{T["lux.table.ucFees"]}</th>
+            <th class="px-4 py-3 text-xs font-semibold text-slate-300 whitespace-nowrap">{T["lux.table.euroFees"]}</th>
+          </tr>
+        </thead>
+        <tbody id="lux-table-body">
+          {providers.filter(p => p.name !== "Monument Assurance Lux.").map((p) => {
+            const fees = feeDetails[p.name];
+            return (
+              <tr class="border-b border-slate-800 hover:bg-slate-800/30 transition-colors"
+                  data-min-val={p.minInvestmentVal}
+                  data-mgmt-val={p.mgmtFeesVal}
+                  data-entry-val={p.entryFeesVal}
+                  data-solvency-val={p.solvencyVal}
+                  data-assets-val={p.assetsVal}
+                  data-year-val={p.yearVal}>
+                <td class="sticky left-0 z-10 bg-slate-900 px-4 py-3 pr-6 font-medium text-slate-100 whitespace-nowrap shadow-[2px_0_8px_-4px_rgba(0,0,0,0.6)]">{p.name}</td>
+                <td class="px-4 py-3 text-slate-400 tabular-nums whitespace-nowrap">{p.minInvestment}</td>
+                <td class="px-4 py-3 text-slate-400 tabular-nums whitespace-nowrap">{p.mgmtFees}</td>
+                <td class="px-4 py-3 text-emerald-400 tabular-nums whitespace-nowrap">{p.entryFees}</td>
+                <td class="px-4 py-3 text-slate-400 tabular-nums whitespace-nowrap">{p.solvencyRatio}</td>
+                <td class="px-4 py-3 text-slate-400 tabular-nums whitespace-nowrap">{p.totalAssets}</td>
+                <td class="px-4 py-3 text-slate-400 tabular-nums whitespace-nowrap">{p.establishedYear}</td>
+                <td class="px-4 py-3 text-slate-400 whitespace-nowrap">{fees?.switchFees ?? 'N/C'}</td>
+                <td class="px-4 py-3 text-emerald-400 whitespace-nowrap">{fees?.exitFees ?? 'N/C'}</td>
+                <td class="px-4 py-3 text-slate-400 tabular-nums whitespace-nowrap">{fees?.structFees ?? 'N/C'}</td>
+                <td class="px-4 py-3 text-slate-400 tabular-nums whitespace-nowrap">{fees?.ucFees ?? 'N/C'}</td>
+                <td class="px-4 py-3 text-slate-400 tabular-nums whitespace-nowrap">{fees?.euroFees ?? 'N/C'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-3 text-[10px] text-slate-600">* {isFr ? 'Frais d\'entrée négociables (commission CGPI).' : 'Entry fees negotiable (advisor commission).'}</p>
+    <p class="mt-1 text-[10px] text-slate-600">
+      {isFr
+        ? '19 contrats d\'assureurs vie CAA listés. Les distributeurs/CGP non-assureurs ont été retirés de la liste.'
+        : "19 CAA life insurer contracts listed. Non-insurer distributors/advisors have been removed from the list."}
+    </p>
+    <p class="mt-1 text-[10px] text-slate-600">
+      {isFr
+        ? 'Monument Assurance est fermé aux nouvelles souscriptions (run-off).'
+        : "Monument Assurance is closed to new business (run-off)."}
+    </p>
+  </section>
+
+  <!-- ─── Benefits / Disadvantages ─── -->
+  <section class="grid gap-4 sm:grid-cols-2">
+    <div class="rounded-xl border border-emerald-800/40 bg-emerald-950/20 p-6">
+      <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold text-emerald-300">
+        <svg class="h-4 w-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        {isFr ? 'Avantages' : 'Benefits'}
+      </h3>
+      <ul class="space-y-2 text-xs text-slate-400">
+        <li class="flex gap-2">
+          <span class="mt-0.5 shrink-0 text-emerald-400">•</span>
+          <span>{isFr ? 'Séparation des biens (compartiment dédié) : protection en cas de faillite de l\'assureur' : 'Asset segregation (dedicated compartment): protection in case of insurer bankruptcy'}</span>
+        </li>
+        <li class="flex gap-2">
+          <span class="mt-0.5 shrink-0 text-emerald-400">•</span>
+          <span>{isFr ? 'Surveillance par le Commissariat aux Assurances (CAA) sous Solvabilité II' : 'Supervised by the CAA under Solvability II'}</span>
+        </li>
+        <li class="flex gap-2">
+          <span class="mt-0.5 shrink-0 text-emerald-400">•</span>
+          <span>{isFr ? 'Accès à des supports indisponibles en France (ETF US, OPCVM étrangers, PE, fonds institutionnels)' : 'Access to supports unavailable in France (US ETFs, foreign UCITS, PE, institutional funds)'}</span>
+        </li>
+        <li class="flex gap-2">
+          <span class="mt-0.5 shrink-0 text-emerald-400">•</span>
+          <span>{isFr ? 'Option pour la capitalisation : pas d\'impôt annuel sur les plus-values' : 'Capitalisation option: no annual tax on capital gains'}</span>
+        </li>
+        <li class="flex gap-2">
+          <span class="mt-0.5 shrink-0 text-emerald-400">•</span>
+          <span>{isFr ? 'Mêmes avantages successoraux qu\'une AV française (art. 990 I du CGI)' : 'Same inheritance benefits as a French AV (art. 990 I CGI)'}</span>
+        </li>
+        <li class="flex gap-2">
+          <span class="mt-0.5 shrink-0 text-emerald-400">•</span>
+          <span>{isFr ? 'Devises multiples (EUR, USD, CHF, GBP) et diversification géographique renforcée' : 'Multi-currency (EUR, USD, CHF, GBP) and enhanced geographic diversification'}</span>
+        </li>
+        <li class="flex gap-2">
+          <span class="mt-0.5 shrink-0 text-emerald-400">•</span>
+          <span>{isFr ? 'Transparence accrue sur les frais et la composition des actifs' : 'Greater transparency on fees and asset composition'}</span>
+        </li>
+      </ul>
+    </div>
+    <div class="rounded-xl border border-red-900/40 bg-red-950/20 p-6">
+      <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold text-red-300">
+        <svg class="h-4 w-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        {isFr ? 'Inconvénients' : 'Disadvantages'}
+      </h3>
+      <ul class="space-y-2 text-xs text-slate-400">
+        <li class="flex gap-2">
+          <span class="mt-0.5 shrink-0 text-red-400">•</span>
+          <span>{isFr ? 'Frais de structure annuels (0,10 % à 0,25 %) que n\'ont pas les contrats français' : 'Annual structure fees (0.10% to 0.25%) that French contracts do not have'}</span>
+        </li>
+        <li class="flex gap-2">
+          <span class="mt-0.5 shrink-0 text-red-400">•</span>
+          <span>{isFr ? 'Frais de gestion globaux plus élevés (0,50 % à 1,50 %) que les meilleurs contrats français' : 'Higher overall management fees (0.50% to 1.50%) than the best French contracts'}</span>
+        </li>
+        <li class="flex gap-2">
+          <span class="mt-0.5 shrink-0 text-red-400">•</span>
+          <span>{isFr ? 'Seuil d\'entrée minimum élevé (souvent 50 000 € à 100 000 €, voire 500 000 €)' : 'High minimum investment (often €50,000 to €100,000, up to €500,000)'}</span>
+        </li>
+        <li class="flex gap-2">
+          <span class="mt-0.5 shrink-0 text-red-400">•</span>
+          <span>{isFr ? 'Complexité et nécessité de passer par un intermédiaire (CGPI, courtier) pour la plupart des contrats' : 'Complexity and need for an intermediary (wealth advisor, broker) for most contracts'}</span>
+        </li>
+        <li class="flex gap-2">
+          <span class="mt-0.5 shrink-0 text-red-400">•</span>
+          <span>{isFr ? 'Frais d\'entrée potentiels (0 % à 5 %, parfois négociables) si passage par un intermédiaire' : 'Potential entry fees (0% to 5%, sometimes negotiable) when using an intermediary'}</span>
+        </li>
+        <li class="flex gap-2">
+          <span class="mt-0.5 shrink-0 text-red-400">•</span>
+          <span>{isFr ? 'Pas de fonds en euros aussi performant qu\'en France (le fonds euro luxembourgeois est souvent moins rémunérateur)' : 'Euro fund performance lower than in France (Luxembourg euro fund is often less rewarding)'}</span>
+        </li>
+        <li class="flex gap-2">
+          <span class="mt-0.5 shrink-0 text-red-400">•</span>
+          <span>{isFr ? 'Fiscalité franco-luxembourgeoise complexe : nécessité de déclarer le contrat au titre du DAC6 / CbC' : 'Complex Franco-Luxembourg taxation: DAC6 / CbC reporting requirements'}</span>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ─── Final verdict ─── -->
+  <section class="rounded-xl border border-purple-800/40 bg-purple-950/20 p-6">
+    <h2 class="mb-3 text-lg font-semibold text-purple-300">
+      {isFr ? 'Verdict' : 'Verdict'}
+    </h2>
+    <p class="text-sm text-slate-400 leading-relaxed">
+      {isFr
+        ? 'L\'assurance vie luxembourgeoise est un outil patrimonial puissant — mais pas pour tout le monde. Elle est pertinente pour les patrimoines supérieurs à 200 000 €, les investisseurs cherchant une diversification avancée (US ETF, private equity, multi-devises) et ceux qui veulent une protection renforcée via la séparation des biens. Pour une épargne inférieure à 100 000 €, un contrat français sans frais d\'entrée (Linxea, BoursoBank, Fortuneo) sera plus efficient.'
+        : 'Luxembourg life insurance is a powerful wealth tool — but not for everyone. It is relevant for portfolios above €200,000, investors seeking advanced diversification (US ETFs, private equity, multi-currency), and those wanting enhanced protection through asset segregation. For savings under €100,000, a no-entry-fee French contract (Linxea, BoursoBank, Fortuneo) will be more efficient.'}
+    </p>
+  </section>
+
+  <!-- ─── Provider List ─── -->
+  <section>
+    <h2 class="mb-3 text-lg font-semibold text-slate-100" data-i18n="lux.list.title">{T["lux.list.title"]}</h2>
+    <p class="mb-5 text-xs text-slate-500 leading-relaxed" data-i18n="lux.list.note">{T["lux.list.note"]}</p>
+
+    <!-- Legend -->
+    <div class="mb-5 flex flex-wrap gap-2 text-[11px]">
+      <span class="rounded border border-emerald-700/30 bg-emerald-500/10 px-2 py-0.5 text-emerald-400">{isFr ? 'Assureur lux. (CAA)' : 'LU insurer (CAA)'}</span>
+      <span class="rounded border border-blue-700/30 bg-blue-500/10 px-2 py-0.5 text-blue-400">{isFr ? 'Marque blanche' : 'White-label'}</span>
+      <span class="rounded border border-amber-700/30 bg-amber-500/10 px-2 py-0.5 text-amber-400">{isFr ? 'Distributeur CGPI' : 'Distributor/advisor'}</span>
+      <span class="rounded border border-purple-700/30 bg-purple-500/10 px-2 py-0.5 text-purple-400">{isFr ? 'LPS (assureur étranger)' : 'LPS (foreign insurer)'}</span>
+      <span class="rounded border border-red-700/30 bg-red-500/10 px-2 py-0.5 text-red-400">{isFr ? 'Non trouvé registre CAA' : 'Not in CAA registry'}</span>
+    </div>
+
+    <div class="space-y-3">
+      {providers.map((p) => (
+        <div class="rounded-xl border border-slate-800 bg-slate-900/40 p-5 transition-all duration-200 hover:border-purple-500/20 hover:bg-slate-900/60">
+          <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1.5">
+                <h3 class="text-sm font-semibold text-slate-100" data-i18n={p.nameKey}>{T[p.nameKey]}</h3>
+                <span class={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${typeBadgeColor(p.type)}`}>
+                  {typeLabel(p.type)}
+                </span>
+                <span class="text-xs">{p.rating}</span>
+              </div>
+              <p class="text-xs text-slate-500 leading-relaxed mb-2" data-i18n={p.descKey}>{T[p.descKey]}</p>
+              <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                <span>
+                  <span class="text-slate-500">{isFr ? 'Min.' : 'Min.'}</span>
+                  <span class="text-slate-400 font-medium tabular-nums">{p.minInvestment}</span>
+                </span>
+                <span>
+                  <span class="text-slate-500">{isFr ? 'Frais gest.' : 'Mgmt fees'}</span>
+                  <span class="text-slate-400 font-medium tabular-nums">{p.mgmtFees}</span>
+                </span>
+                <span>
+                  <span class="text-slate-500">{isFr ? 'Frais entrée' : 'Entry fees'}</span>
+                  <span class="text-slate-400 font-medium tabular-nums">{p.entryFees}</span>
+                </span>
+              </div>
+            </div>
+            <div class="shrink-0">
+              <a href={`https://www.${T[p.contactKey]}`} target="_blank" rel="noopener noreferrer"
+                 class="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-1.5 text-xs font-medium text-slate-300 transition-all hover:border-purple-500/40 hover:bg-slate-800 hover:text-purple-300">
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                <span data-i18n={p.contactKey}>{T[p.contactKey]}</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <p class="mt-4 text-[10px] text-slate-600 leading-relaxed">
+      {isFr
+        ? 'Source : Registre CAA Luxembourg (caa.lu, juillet 2026). 28 assureurs-vie agréés au Luxembourg, dont 25 accessibles aux résidents français. Les entités marquées "Non trouvé registre CAA" ne figurent pas dans le registre officiel — il peut s\'agir d\'anciens noms commerciaux, de distributeurs ou d\'entités radiées.'
+        : 'Source: CAA Luxembourg registry (caa.lu, July 2026). 28 life insurers licensed in Luxembourg, of which 25 are accessible to French residents. Entities marked "Not in CAA registry" do not appear in the official register — they may be legacy trade names, distributors, or deregistered entities.'}
+    </p>
+  </section>
+
+</div>
+
+<script>
+  (function() {
+    const table = document.getElementById('lux-compare-table');
+    const tbody = document.getElementById('lux-table-body');
+    if (!table || !tbody) return;
+
+    const sortKeyMap = {
+      min: 'minVal',
+      mgmt: 'mgmtVal',
+      entry: 'entryVal',
+      solvency: 'solvencyVal',
+      assets: 'assetsVal',
+      year: 'yearVal',
+    };
+
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const originalOrder = rows.slice();
+
+    function sortTable(key, dir) {
+      const attr = sortKeyMap[key];
+      if (!attr) return;
+
+      const sorted = rows.slice().sort((a, b) => {
+        let va = parseFloat(a.dataset[attr] || '0');
+        let vb = parseFloat(b.dataset[attr] || '0');
+        if (isNaN(va)) va = dir === 'asc' ? Infinity : -Infinity;
+        if (isNaN(vb)) vb = dir === 'asc' ? Infinity : -Infinity;
+        return dir === 'asc' ? va - vb : vb - va;
+      });
+
+      sorted.forEach(r => tbody.appendChild(r));
+
+      document.querySelectorAll('th[data-sort-key] .sort-arrow').forEach(arrow => {
+        arrow.textContent = '↕';
+        arrow.classList.remove('text-purple-400');
+        arrow.classList.add('text-slate-600');
+      });
+
+      const activeTh = table.querySelector(`th[data-sort-key="${key}"]`);
+      if (activeTh) {
+        const arrow = activeTh.querySelector('.sort-arrow');
+        if (arrow) {
+          arrow.textContent = dir === 'asc' ? '↑' : '↓';
+          arrow.classList.remove('text-slate-600');
+          arrow.classList.add('text-purple-400');
+        }
+      }
+    }
+
+    function resetOrder() {
+      originalOrder.forEach(r => tbody.appendChild(r));
+      document.querySelectorAll('th[data-sort-key] .sort-arrow').forEach(arrow => {
+        arrow.textContent = '↕';
+        arrow.classList.remove('text-purple-400');
+        arrow.classList.add('text-slate-600');
+      });
+    }
+
+    table.querySelectorAll('th[data-sort-key]').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sortKey;
+        if (key === 'name') return;
+
+        let dir = th.dataset.sortDir || '';
+        if (!dir) dir = 'asc';
+        else if (dir === 'asc') dir = 'desc';
+        else dir = '';
+
+        th.dataset.sortDir = dir;
+
+        if (!dir) {
+          resetOrder();
+        } else {
+          sortTable(key, dir);
+        }
+      });
+    });
+  })();
+</script>
+
+</BaseLayout>
