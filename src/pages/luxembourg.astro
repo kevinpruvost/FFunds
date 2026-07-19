@@ -549,15 +549,27 @@ const feeDetails: Record<string, { switchFees: string; exitFees: string; structF
 
   <!-- ─── Why Luxembourg ─── -->
   <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-6">
-    <h2 class="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-100" data-i18n="lux.why.title">
+    <h2 class="mb-4 flex items-center gap-2 text-xl font-semibold text-slate-100" data-i18n="lux.why.title">
       <svg class="h-5 w-5 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m0 0a9 9 0 019 9"/>
       </svg>
       {T["lux.why.title"]}
     </h2>
-    <p class="mb-3 text-sm text-slate-400 leading-relaxed" data-i18n="lux.why.p1">{T["lux.why.p1"]}</p>
-    <p class="mb-3 text-sm text-slate-400 leading-relaxed" data-i18n="lux.why.p2">{T["lux.why.p2"]}</p>
-    <p class="text-sm text-amber-400 leading-relaxed" data-i18n="lux.why.p3">{T["lux.why.p3"]}</p>
+    <p class="mb-3 text-base text-slate-400 leading-relaxed">
+      {isFr
+        ? "Régulée par le CAA sous Solvabilité II, l'AV luxembourgeoise offre une sécurité supérieure : les actifs sont séparés des fonds propres de l'assureur, protégeant l'épargnant en cas de faillite."
+        : "Regulated by the CAA under Solvency II, Luxembourg life insurance offers superior security: assets are segregated from the insurer's own funds, protecting savers in case of bankruptcy."}
+    </p>
+    <p class="mb-3 text-base text-slate-400 leading-relaxed">
+      {isFr
+        ? "Accès à des supports exclusifs (ETF US, private equity, fonds institutionnels) et fiscalité avantageuse : capitalisation sans impôt annuel, avec les mêmes avantages successoraux qu'une AV française."
+        : "Access to exclusive supports (US ETFs, private equity, institutional funds) and favorable tax treatment: capitalization without annual tax, with the same inheritance benefits as a French life insurance policy."}
+    </p>
+    <p class="text-base text-amber-400 leading-relaxed">
+      {isFr
+        ? "Frais plus élevés qu'en France (gestion 0,60 %–1,50 % + structure). Pertinente pour les patrimoines > 200 000 € et la diversification avancée."
+        : "Fees are higher than in France (management 0.60%–1.50% + structure). Relevant for portfolios > €200,000 and advanced diversification."}
+    </p>
   </section>
 
   <!-- ─── Comparison Table ─── -->
@@ -649,31 +661,31 @@ const feeDetails: Record<string, { switchFees: string; exitFees: string; structF
       <ul class="space-y-2 text-xs text-slate-400">
         <li class="flex gap-2">
           <span class="mt-0.5 shrink-0 text-emerald-400">•</span>
-          <span>{isFr ? 'Séparation des biens (compartiment dédié) : protection en cas de faillite de l\'assureur' : 'Asset segregation (dedicated compartment): protection in case of insurer bankruptcy'}</span>
+          <span>{isFr ? 'Séparation des biens : protection en cas de faillite de l\'assureur' : 'Asset segregation: protection if insurer fails'}</span>
         </li>
         <li class="flex gap-2">
           <span class="mt-0.5 shrink-0 text-emerald-400">•</span>
-          <span>{isFr ? 'Surveillance par le Commissariat aux Assurances (CAA) sous Solvabilité II' : 'Supervised by the CAA under Solvability II'}</span>
+          <span>{isFr ? 'Surveillance CAA sous Solvabilité II' : 'CAA supervised under Solvency II'}</span>
         </li>
         <li class="flex gap-2">
           <span class="mt-0.5 shrink-0 text-emerald-400">•</span>
-          <span>{isFr ? 'Accès à des supports indisponibles en France (ETF US, OPCVM étrangers, PE, fonds institutionnels)' : 'Access to supports unavailable in France (US ETFs, foreign UCITS, PE, institutional funds)'}</span>
+          <span>{isFr ? 'Accès exclusif : ETF US, OPCVM étrangers, PE, fonds institutionnels' : 'Exclusive access: US ETFs, foreign UCITS, PE, institutional funds'}</span>
         </li>
         <li class="flex gap-2">
           <span class="mt-0.5 shrink-0 text-emerald-400">•</span>
-          <span>{isFr ? 'Option pour la capitalisation : pas d\'impôt annuel sur les plus-values' : 'Capitalisation option: no annual tax on capital gains'}</span>
+          <span>{isFr ? 'Capitalisation : pas d\'impôt annuel sur les plus-values' : 'Capitalization: no annual tax on gains'}</span>
         </li>
         <li class="flex gap-2">
           <span class="mt-0.5 shrink-0 text-emerald-400">•</span>
-          <span>{isFr ? 'Mêmes avantages successoraux qu\'une AV française (art. 990 I du CGI)' : 'Same inheritance benefits as a French AV (art. 990 I CGI)'}</span>
+          <span>{isFr ? 'Mêmes avantages successoraux qu\'une AV française' : 'Same inheritance benefits as French life insurance'}</span>
         </li>
         <li class="flex gap-2">
           <span class="mt-0.5 shrink-0 text-emerald-400">•</span>
-          <span>{isFr ? 'Devises multiples (EUR, USD, CHF, GBP) et diversification géographique renforcée' : 'Multi-currency (EUR, USD, CHF, GBP) and enhanced geographic diversification'}</span>
+          <span>{isFr ? 'Multi-devises (EUR, USD, CHF, GBP) et diversification géographique' : 'Multi-currency (EUR, USD, CHF, GBP) and geographic diversification'}</span>
         </li>
         <li class="flex gap-2">
           <span class="mt-0.5 shrink-0 text-emerald-400">•</span>
-          <span>{isFr ? 'Transparence accrue sur les frais et la composition des actifs' : 'Greater transparency on fees and asset composition'}</span>
+          <span>{isFr ? 'Transparence accrue sur frais et actifs' : 'Greater fee and asset transparency'}</span>
         </li>
       </ul>
     </div>
@@ -687,31 +699,31 @@ const feeDetails: Record<string, { switchFees: string; exitFees: string; structF
       <ul class="space-y-2 text-xs text-slate-400">
         <li class="flex gap-2">
           <span class="mt-0.5 shrink-0 text-red-400">•</span>
-          <span>{isFr ? 'Frais de structure annuels (0,10 % à 0,25 %) que n\'ont pas les contrats français' : 'Annual structure fees (0.10% to 0.25%) that French contracts do not have'}</span>
+          <span>{isFr ? 'Frais de structure annuels (0,10 %–0,25 %) absents en France' : 'Annual structure fees (0.10%–0.25%) not present in France'}</span>
         </li>
         <li class="flex gap-2">
           <span class="mt-0.5 shrink-0 text-red-400">•</span>
-          <span>{isFr ? 'Frais de gestion globaux plus élevés (0,50 % à 1,50 %) que les meilleurs contrats français' : 'Higher overall management fees (0.50% to 1.50%) than the best French contracts'}</span>
+          <span>{isFr ? 'Frais de gestion globaux plus élevés (0,50 %–1,50 %)' : 'Higher management fees (0.50%–1.50%)'}</span>
         </li>
         <li class="flex gap-2">
           <span class="mt-0.5 shrink-0 text-red-400">•</span>
-          <span>{isFr ? 'Seuil d\'entrée minimum élevé (souvent 50 000 € à 100 000 €, voire 500 000 €)' : 'High minimum investment (often €50,000 to €100,000, up to €500,000)'}</span>
+          <span>{isFr ? 'Seuil d\'entrée élevé (50 000 €–500 000 €)' : 'High minimum investment (€50,000–€500,000)'}</span>
         </li>
         <li class="flex gap-2">
           <span class="mt-0.5 shrink-0 text-red-400">•</span>
-          <span>{isFr ? 'Complexité et nécessité de passer par un intermédiaire (CGPI, courtier) pour la plupart des contrats' : 'Complexity and need for an intermediary (wealth advisor, broker) for most contracts'}</span>
+          <span>{isFr ? 'Nécessite souvent un intermédiaire (CGPI, courtier)' : 'Often requires an intermediary (advisor, broker)'}</span>
         </li>
         <li class="flex gap-2">
           <span class="mt-0.5 shrink-0 text-red-400">•</span>
-          <span>{isFr ? 'Frais d\'entrée potentiels (0 % à 5 %, parfois négociables) si passage par un intermédiaire' : 'Potential entry fees (0% to 5%, sometimes negotiable) when using an intermediary'}</span>
+          <span>{isFr ? 'Frais d\'entrée possibles (0 %–5 %, négociables)' : 'Potential entry fees (0%–5%, negotiable)'}</span>
         </li>
         <li class="flex gap-2">
           <span class="mt-0.5 shrink-0 text-red-400">•</span>
-          <span>{isFr ? 'Pas de fonds en euros aussi performant qu\'en France (le fonds euro luxembourgeois est souvent moins rémunérateur)' : 'Euro fund performance lower than in France (Luxembourg euro fund is often less rewarding)'}</span>
+          <span>{isFr ? 'Fonds euro moins performant qu\'en France' : 'Euro fund less performant than in France'}</span>
         </li>
         <li class="flex gap-2">
           <span class="mt-0.5 shrink-0 text-red-400">•</span>
-          <span>{isFr ? 'Fiscalité franco-luxembourgeoise complexe : nécessité de déclarer le contrat au titre du DAC6 / CbC' : 'Complex Franco-Luxembourg taxation: DAC6 / CbC reporting requirements'}</span>
+          <span>{isFr ? 'Fiscalité complexe : déclaration DAC6 / CbC requise' : 'Complex taxation: DAC6 / CbC reporting required'}</span>
         </li>
       </ul>
     </div>
@@ -719,13 +731,13 @@ const feeDetails: Record<string, { switchFees: string; exitFees: string; structF
 
   <!-- ─── Final verdict ─── -->
   <section class="rounded-xl border border-purple-800/40 bg-purple-950/20 p-6">
-    <h2 class="mb-3 text-lg font-semibold text-purple-300">
+    <h2 class="mb-3 text-xl font-semibold text-purple-300">
       {isFr ? 'Verdict' : 'Verdict'}
     </h2>
-    <p class="text-sm text-slate-400 leading-relaxed">
+    <p class="text-base text-slate-400 leading-relaxed">
       {isFr
-        ? 'L\'assurance vie luxembourgeoise est un outil patrimonial puissant — mais pas pour tout le monde. Elle est pertinente pour les patrimoines supérieurs à 200 000 €, les investisseurs cherchant une diversification avancée (US ETF, private equity, multi-devises) et ceux qui veulent une protection renforcée via la séparation des biens. Pour une épargne inférieure à 100 000 €, un contrat français sans frais d\'entrée (Linxea, BoursoBank, Fortuneo) sera plus efficient.'
-        : 'Luxembourg life insurance is a powerful wealth tool — but not for everyone. It is relevant for portfolios above €200,000, investors seeking advanced diversification (US ETFs, private equity, multi-currency), and those wanting enhanced protection through asset segregation. For savings under €100,000, a no-entry-fee French contract (Linxea, BoursoBank, Fortuneo) will be more efficient.'}
+        ? "Outil patrimonial puissant, mais ciblé. Pertinent pour les patrimoines > 200 000 €, la diversification avancée (ETF US, PE, multi-devises) et la protection par séparation des biens. En dessous, un CTO bien construit (ETF world, rééquilibrage annuel) est plus simple, moins coûteux et fiscalement aussi efficace avec un bon suivi."
+        : "A powerful wealth tool, but targeted. Relevant for portfolios above €200,000, advanced diversification (US ETFs, PE, multi-currency), and asset-segregation protection. Below that, a well-built brokerage account (world ETF, annual rebalancing) is simpler, cheaper, and just as tax-efficient with proper tracking."}
     </p>
   </section>
 

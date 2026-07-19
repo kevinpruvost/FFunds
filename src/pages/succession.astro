@@ -1,0 +1,321 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { readLang } from '../i18n/astro-i18n';
+import { TRANSLATIONS } from '../i18n/translations';
+import SuccessionCalculator from '../components/SuccessionCalculator';
+import SourceLinks from '../components/SourceLinks.astro';
+
+const lang = readLang();
+const T = TRANSLATIONS[lang];
+const isFr = lang === 'fr';
+
+// Rate brackets by relationship (language-invariant)
+const rates: Record<string, string> = {
+  'child': '5% — 45%',
+  'sibling': '35% — 45%',
+  'nephew': '55%',
+  'other': '60%',
+};
+
+// Usufruct age scale (compact: 3 cols × 3 rows)
+const usufructScale = [
+  { a: '<21', v: '90/10' }, { a: '21-30', v: '80/20' }, { a: '31-40', v: '70/30' },
+  { a: '41-50', v: '60/40' }, { a: '51-60', v: '50/50' }, { a: '61-70', v: '40/60' },
+  { a: '71-80', v: '30/70' }, { a: '81-90', v: '20/80' }, { a: '91+', v: '10/90' },
+];
+
+// Official references; text fragments open the relevant passage when supported by the browser.
+const sources = {
+  succession: [
+    { label: 'Service-Public — droits de succession', href: 'https://www.service-public.fr/particuliers/vosdroits/F14198?lang=fr#:~:text=L%27abattement%20et%20le%20bar%C3%A8me%20applicables' },
+    { label: 'impots.gouv.fr — calcul et barème', href: 'https://www.impots.gouv.fr/particulier/calcul-et-paiement-des-droits#:~:text=Les%20abattements%20et%20les%20bar%C3%A8mes%20diff%C3%A8rent' },
+  ],
+  assuranceVie: [
+    { label: 'impots.gouv.fr — assurance-vie (990 I / 757 B)', href: 'https://www.impots.gouv.fr/international-particulier/questions/je-suis-beneficiaire-dune-assurance-vie-comment-sont-imposees#:~:text=Avant%2070%20ans%2C%20abattement' },
+    { label: 'impots.gouv.fr — retrait / rachat des gains', href: 'https://www.impots.gouv.fr/particulier/questions/jai-effectue-des-retraits-sur-mon-contrat-dassurance-vie-quelles-sont-les#:~:text=Les%20produits%20des%20contrats%20sont%20soumis' },
+  ],
+  per: [
+    { label: 'Service-Public — PER au décès', href: 'https://www.service-public.fr/particuliers/vosdroits/F36526/0?idFicheParent=F34982#:~:text=D%C3%A9c%C3%A8s%20avant%2070%20ans' },
+  ],
+  usufruit: [
+    { label: 'Légifrance — CGI art. 669', href: 'https://www.legifrance.gouv.fr/loda/article_lc/LEGIARTI000006310173/2025-02-14#:~:text=AGE%20de%20l%27usufruitier' },
+  ],
+  donation: [
+    { label: 'impots.gouv.fr — donations', href: 'https://www.impots.gouv.fr/particulier/donations-par-acte-notarie#:~:text=Les%20abattements%20de%20100%20000%20%E2%82%AC%20par%20enfant' },
+    { label: 'impots.gouv.fr — dons familiaux', href: 'https://www.impots.gouv.fr/particulier/dons-exoneres#:~:text=31%20865%20%E2%82%AC%20tous%20les%20quinze%20ans' },
+  ],
+  enterprise: [
+    { label: 'impots.gouv.fr — transmission d’entreprise', href: 'https://www.impots.gouv.fr/professionnel/transmission-titre-gratuit#:~:text=exon%C3%A9ration%20%C3%A0%20concurrence%20de%2075%20%25' },
+    { label: 'BOFiP — pacte Dutreil', href: 'https://bofip.impots.gouv.fr/bofip/6509-PGP.html/identifiant%3DBOI-ENR-DMTG-10-20-40-10-20240530#:~:text=75%20%25%20de%20leur%20valeur' },
+  ],
+  reserve: [
+    { label: 'Service-Public — réserve héréditaire', href: 'https://www.service-public.fr/particuliers/vosdroits/F36739/1_0?idFicheParent=F2529#:~:text=Les%20h%C3%A9ritiers%20r%C3%A9servataires' },
+    { label: 'Service-Public — donation-partage', href: 'https://www.service-public.fr/particuliers/vosdroits/F1266#:~:text=Quelle%20part%20de%20son%20patrimoine%20peut-on%20donner' },
+  ],
+};
+---
+
+<BaseLayout title={T["succ.title"]} description={T["succ.subtitle"]}>
+
+<div class="mb-8">
+  <h1 class="text-2xl font-bold text-slate-50" data-i18n="succ.title">{T["succ.title"]}</h1>
+  <p class="mt-1 text-base text-slate-400" data-i18n="succ.subtitle">{T["succ.subtitle"]}</p>
+</div>
+
+<div class="max-w-4xl space-y-10">
+
+  <!-- ─── Calculator ─── -->
+  <SuccessionCalculator T={T} isFr={isFr} client:load />
+
+  <!-- ─── Master Comparison Table ─── -->
+  <section>
+    <h2 class="mb-3 text-xl font-semibold text-slate-100" data-i18n="succ.table.title">{T["succ.table.title"]}</h2>
+    <SourceLinks links={sources.succession} label={isFr ? 'Sources officielles' : 'Official sources'} />
+    <div class="overflow-x-auto rounded-xl border border-slate-800">
+      <table class="w-full text-left text-xs">
+        <thead>
+          <tr class="border-b border-slate-700 bg-slate-900/60">
+            <th class="px-4 py-3 font-semibold text-slate-300 whitespace-nowrap" data-i18n="succ.table.header.asset">{T["succ.table.header.asset"]}</th>
+            <th class="px-4 py-3 font-semibold text-slate-300 min-w-[120px]" data-i18n="succ.table.header.conjoint">{T["succ.table.header.conjoint"]}</th>
+            <th class="px-4 py-3 font-semibold text-slate-300 min-w-[160px]" data-i18n="succ.table.header.enfant">{T["succ.table.header.enfant"]}</th>
+            <th class="px-4 py-3 font-semibold text-slate-300 min-w-[160px]" data-i18n="succ.table.header.petitEnfant">{T["succ.table.header.petitEnfant"]}</th>
+            <th class="px-4 py-3 font-semibold text-slate-300 min-w-[140px]" data-i18n="succ.table.header.frereSoeur">{T["succ.table.header.frereSoeur"]}</th>
+            <th class="px-4 py-3 font-semibold text-slate-300 min-w-[140px]" data-i18n="succ.table.header.neveuCousin">{T["succ.table.header.neveuCousin"]}</th>
+            <th class="px-4 py-3 font-semibold text-slate-300 min-w-[120px]" data-i18n="succ.table.header.nonParent">{T["succ.table.header.nonParent"]}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- AV before 70 row (art. 990 I) -->
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-2.5 font-medium text-slate-100 whitespace-nowrap" data-i18n="succ.table.row.av70-">{T["succ.table.row.av70-"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.av70-.conjoint">{T["succ.table.av70-.conjoint"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.av70-.enfant">{T["succ.table.av70-.enfant"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.av70-.petitEnfant">{T["succ.table.av70-.petitEnfant"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.av70-.frereSoeur">{T["succ.table.av70-.frereSoeur"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.av70-.neveuCousin">{T["succ.table.av70-.neveuCousin"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.av70-.nonParent">{T["succ.table.av70-.nonParent"]}</td>
+          </tr>
+          <!-- AV after 70 row (art. 757 B) -->
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-2.5 font-medium text-slate-100 whitespace-nowrap" data-i18n="succ.table.row.av70+">{T["succ.table.row.av70+"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.av70+.conjoint">{T["succ.table.av70+.conjoint"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.av70+.enfant">{T["succ.table.av70+.enfant"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.av70+.petitEnfant">{T["succ.table.av70+.petitEnfant"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.av70+.frereSoeur">{T["succ.table.av70+.frereSoeur"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.av70+.neveuCousin">{T["succ.table.av70+.neveuCousin"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.av70+.nonParent">{T["succ.table.av70+.nonParent"]}</td>
+          </tr>
+          <!-- PER row (rates: child/sibling/nephew/other) -->
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-2.5 font-medium text-slate-100 whitespace-nowrap" data-i18n="succ.table.row.per">{T["succ.table.row.per"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.per.conjoint">{T["succ.table.per.conjoint"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top"><div data-i18n="succ.table.per.enfant">{T["succ.table.per.enfant"]}</div><div class="mt-0.5 text-[10px] text-slate-500 leading-tight">{rates['child']}</div></td>
+            <td class="px-4 py-2.5 text-slate-400 align-top"><div data-i18n="succ.table.per.petitEnfant">{T["succ.table.per.petitEnfant"]}</div><div class="mt-0.5 text-[10px] text-slate-500 leading-tight">{rates['child']}</div></td>
+            <td class="px-4 py-2.5 text-slate-400 align-top"><div data-i18n="succ.table.per.frereSoeur">{T["succ.table.per.frereSoeur"]}</div><div class="mt-0.5 text-[10px] text-slate-500 leading-tight">{rates['sibling']}</div></td>
+            <td class="px-4 py-2.5 text-slate-400 align-top"><div data-i18n="succ.table.per.neveuCousin">{T["succ.table.per.neveuCousin"]}</div><div class="mt-0.5 text-[10px] text-slate-500 leading-tight">{rates['nephew']}</div></td>
+            <td class="px-4 py-2.5 text-slate-400 align-top"><div data-i18n="succ.table.per.nonParent">{T["succ.table.per.nonParent"]}</div><div class="mt-0.5 text-[10px] text-slate-500 leading-tight">{rates['other']}</div></td>
+          </tr>
+          <!-- Immo row (rates: child/sibling/nephew/other) -->
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-2.5 font-medium text-slate-100 whitespace-nowrap" data-i18n="succ.table.row.immo">{T["succ.table.row.immo"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.immo.conjoint">{T["succ.table.immo.conjoint"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top"><div data-i18n="succ.table.immo.enfant">{T["succ.table.immo.enfant"]}</div><div class="mt-0.5 text-[10px] text-slate-500 leading-tight">{rates['child']}</div></td>
+            <td class="px-4 py-2.5 text-slate-400 align-top"><div data-i18n="succ.table.immo.petitEnfant">{T["succ.table.immo.petitEnfant"]}</div><div class="mt-0.5 text-[10px] text-slate-500 leading-tight">{rates['child']}</div></td>
+            <td class="px-4 py-2.5 text-slate-400 align-top"><div data-i18n="succ.table.immo.frereSoeur">{T["succ.table.immo.frereSoeur"]}</div><div class="mt-0.5 text-[10px] text-slate-500 leading-tight">{rates['sibling']}</div></td>
+            <td class="px-4 py-2.5 text-slate-400 align-top"><div data-i18n="succ.table.immo.neveuCousin">{T["succ.table.immo.neveuCousin"]}</div><div class="mt-0.5 text-[10px] text-slate-500 leading-tight">{rates['nephew']}</div></td>
+            <td class="px-4 py-2.5 text-slate-400 align-top"><div data-i18n="succ.table.immo.nonParent">{T["succ.table.immo.nonParent"]}</div><div class="mt-0.5 text-[10px] text-slate-500 leading-tight">{rates['other']}</div></td>
+          </tr>
+          <!-- Dons row (only nonParent has rate) -->
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-2.5 font-medium text-slate-100 whitespace-nowrap" data-i18n="succ.table.row.don">{T["succ.table.row.don"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.don.conjoint">{T["succ.table.don.conjoint"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.don.enfant">{T["succ.table.don.enfant"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.don.petitEnfant">{T["succ.table.don.petitEnfant"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.don.frereSoeur">{T["succ.table.don.frereSoeur"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.don.neveuCousin">{T["succ.table.don.neveuCousin"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top"><div data-i18n="succ.table.don.nonParent">{T["succ.table.don.nonParent"]}</div><div class="mt-0.5 text-[10px] text-slate-500 leading-tight">{rates['other']}</div></td>
+          </tr>
+          <!-- Entreprise row (only nonParent has rate) -->
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-2.5 font-medium text-slate-100 whitespace-nowrap" data-i18n="succ.table.row.ent">{T["succ.table.row.ent"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.ent.conjoint">{T["succ.table.ent.conjoint"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.ent.enfant">{T["succ.table.ent.enfant"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.ent.petitEnfant">{T["succ.table.ent.petitEnfant"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.ent.frereSoeur">{T["succ.table.ent.frereSoeur"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.ent.neveuCousin">{T["succ.table.ent.neveuCousin"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top"><div data-i18n="succ.table.ent.nonParent">{T["succ.table.ent.nonParent"]}</div><div class="mt-0.5 text-[10px] text-slate-500 leading-tight">{rates['other']}</div></td>
+          </tr>
+          <!-- Usufruit row (all columns show age scale) -->
+          <tr class="hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-2.5 font-medium text-slate-100 whitespace-nowrap" data-i18n="succ.table.row.usufruit">{T["succ.table.row.usufruit"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top" data-i18n="succ.table.usufruit.conjoint">{T["succ.table.usufruit.conjoint"]}</td>
+            <td class="px-4 py-2.5 text-slate-400 align-top text-[10px] leading-tight">
+              <div class="text-xs text-slate-400 mb-0.5" data-i18n="succ.table.usufruit.enfant">{T["succ.table.usufruit.enfant"]}</div>
+              {usufructScale.slice(0, 3).map(e => <div class="flex gap-1"><span class="w-8 text-slate-500">{e.a}</span><span>{e.v}</span></div>)}
+              {usufructScale.slice(3, 6).map(e => <div class="flex gap-1"><span class="w-8 text-slate-500">{e.a}</span><span>{e.v}</span></div>)}
+              {usufructScale.slice(6, 9).map(e => <div class="flex gap-1"><span class="w-8 text-slate-500">{e.a}</span><span>{e.v}</span></div>)}
+            </td>
+            <td class="px-4 py-2.5 text-slate-400 align-top text-[10px] leading-tight">
+              <div class="text-xs text-slate-400 mb-0.5" data-i18n="succ.table.usufruit.petitEnfant">{T["succ.table.usufruit.petitEnfant"]}</div>
+              {usufructScale.slice(0, 3).map(e => <div class="flex gap-1"><span class="w-8 text-slate-500">{e.a}</span><span>{e.v}</span></div>)}
+              {usufructScale.slice(3, 6).map(e => <div class="flex gap-1"><span class="w-8 text-slate-500">{e.a}</span><span>{e.v}</span></div>)}
+              {usufructScale.slice(6, 9).map(e => <div class="flex gap-1"><span class="w-8 text-slate-500">{e.a}</span><span>{e.v}</span></div>)}
+            </td>
+            <td class="px-4 py-2.5 text-slate-400 align-top text-[10px] leading-tight">
+              <div class="text-xs text-slate-400 mb-0.5" data-i18n="succ.table.usufruit.frereSoeur">{T["succ.table.usufruit.frereSoeur"]}</div>
+              {usufructScale.slice(0, 3).map(e => <div class="flex gap-1"><span class="w-8 text-slate-500">{e.a}</span><span>{e.v}</span></div>)}
+              {usufructScale.slice(3, 6).map(e => <div class="flex gap-1"><span class="w-8 text-slate-500">{e.a}</span><span>{e.v}</span></div>)}
+              {usufructScale.slice(6, 9).map(e => <div class="flex gap-1"><span class="w-8 text-slate-500">{e.a}</span><span>{e.v}</span></div>)}
+            </td>
+            <td class="px-4 py-2.5 text-slate-400 align-top text-[10px] leading-tight">
+              <div class="text-xs text-slate-400 mb-0.5" data-i18n="succ.table.usufruit.neveuCousin">{T["succ.table.usufruit.neveuCousin"]}</div>
+              {usufructScale.slice(0, 3).map(e => <div class="flex gap-1"><span class="w-8 text-slate-500">{e.a}</span><span>{e.v}</span></div>)}
+              {usufructScale.slice(3, 6).map(e => <div class="flex gap-1"><span class="w-8 text-slate-500">{e.a}</span><span>{e.v}</span></div>)}
+              {usufructScale.slice(6, 9).map(e => <div class="flex gap-1"><span class="w-8 text-slate-500">{e.a}</span><span>{e.v}</span></div>)}
+            </td>
+            <td class="px-4 py-2.5 text-slate-400 align-top text-[10px] leading-tight">
+              <div class="text-xs text-slate-400 mb-0.5" data-i18n="succ.table.usufruit.nonParent">{T["succ.table.usufruit.nonParent"]}</div>
+              {usufructScale.slice(0, 3).map(e => <div class="flex gap-1"><span class="w-8 text-slate-500">{e.a}</span><span>{e.v}</span></div>)}
+              {usufructScale.slice(3, 6).map(e => <div class="flex gap-1"><span class="w-8 text-slate-500">{e.a}</span><span>{e.v}</span></div>)}
+              {usufructScale.slice(6, 9).map(e => <div class="flex gap-1"><span class="w-8 text-slate-500">{e.a}</span><span>{e.v}</span></div>)}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ─── Assurance Vie Succession ─── -->
+  <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-6">
+    <h2 class="mb-4 flex items-center gap-2 text-xl font-semibold text-slate-100" data-i18n="succ.av.title">
+      <svg class="h-5 w-5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      {T["succ.av.title"]}
+    </h2>
+    <SourceLinks links={sources.assuranceVie} label={isFr ? 'Sources officielles' : 'Official sources'} />
+    <ul class="space-y-2 text-base text-slate-400">
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.av.p1">{T["succ.av.p1"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.av.p2">{T["succ.av.p2"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.av.p3">{T["succ.av.p3"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.av.p4">{T["succ.av.p4"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.av.p5">{T["succ.av.p5"]}</span></li>
+    </ul>
+  </section>
+
+  <!-- ─── PER Succession ─── -->
+  <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-6">
+    <h2 class="mb-4 flex items-center gap-2 text-xl font-semibold text-slate-100" data-i18n="succ.per.title">
+      <svg class="h-5 w-5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      {T["succ.per.title"]}
+    </h2>
+    <SourceLinks links={sources.per} label={isFr ? 'Source officielle' : 'Official source'} />
+    <ul class="space-y-2 text-base text-slate-400">
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.per.p1">{T["succ.per.p1"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.per.p2">{T["succ.per.p2"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.per.p3">{T["succ.per.p3"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.per.p4">{T["succ.per.p4"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.per.p5">{T["succ.per.p5"]}</span></li>
+    </ul>
+  </section>
+
+  <!-- ─── Immobilier Succession ─── -->
+  <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-6">
+    <h2 class="mb-4 flex items-center gap-2 text-xl font-semibold text-slate-100" data-i18n="succ.immo.title">
+      <svg class="h-5 w-5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1"/>
+      </svg>
+      {T["succ.immo.title"]}
+    </h2>
+    <SourceLinks links={sources.succession} label={isFr ? 'Sources officielles' : 'Official sources'} />
+    <ul class="space-y-2 text-base text-slate-400">
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.immo.p1">{T["succ.immo.p1"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.immo.p2">{T["succ.immo.p2"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.immo.p3">{T["succ.immo.p3"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.immo.p4">{T["succ.immo.p4"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.immo.p5">{T["succ.immo.p5"]}</span></li>
+    </ul>
+  </section>
+
+  <!-- ─── Dons directs / Donations ─── -->
+  <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-6">
+    <h2 class="mb-4 flex items-center gap-2 text-xl font-semibold text-slate-100" data-i18n="succ.don.title">
+      <svg class="h-5 w-5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a4 4 0 00-4-4H5.5a2.5 2.5 0 00-2.5 2.5v0A2.5 2.5 0 005.5 7H9a1 1 0 001-1V5m3 3v8m0-8V6a4 4 0 014-4h2.5a2.5 2.5 0 012.5 2.5v0A2.5 2.5 0 0118.5 7H15a1 1 0 00-1 1v0"/>
+      </svg>
+      {T["succ.don.title"]}
+    </h2>
+    <SourceLinks links={sources.donation} label={isFr ? 'Sources officielles' : 'Official sources'} />
+    <ul class="space-y-2 text-base text-slate-400">
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.don.p1">{T["succ.don.p1"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.don.p2">{T["succ.don.p2"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.don.p3">{T["succ.don.p3"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.don.p4">{T["succ.don.p4"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.don.p5">{T["succ.don.p5"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.don.p6">{T["succ.don.p6"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.don.p7">{T["succ.don.p7"]}</span></li>
+    </ul>
+  </section>
+
+  <!-- ─── Entreprise / Titres Succession ─── -->
+  <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-6">
+    <h2 class="mb-4 flex items-center gap-2 text-xl font-semibold text-slate-100" data-i18n="succ.ent.title">
+      <svg class="h-5 w-5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+      </svg>
+      {T["succ.ent.title"]}
+    </h2>
+    <SourceLinks links={sources.enterprise} label={isFr ? 'Sources officielles' : 'Official sources'} />
+    <ul class="space-y-2 text-base text-slate-400">
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.ent.p1">{T["succ.ent.p1"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.ent.p2">{T["succ.ent.p2"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.ent.p3">{T["succ.ent.p3"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.ent.p4">{T["succ.ent.p4"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.ent.p5">{T["succ.ent.p5"]}</span></li>
+    </ul>
+  </section>
+
+  <!-- ─── Usufruit / Démembrement ─── -->
+  <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-6">
+    <h2 class="mb-4 flex items-center gap-2 text-xl font-semibold text-slate-100" data-i18n="succ.usufruit.title">
+      <svg class="h-5 w-5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+      </svg>
+      {T["succ.usufruit.title"]}
+    </h2>
+    <SourceLinks links={sources.usufruit} label={isFr ? 'Source officielle' : 'Official source'} />
+    <ul class="space-y-2 text-base text-slate-400">
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.usufruit.p1">{T["succ.usufruit.p1"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.usufruit.p2">{T["succ.usufruit.p2"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.usufruit.p3">{T["succ.usufruit.p3"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.usufruit.p4">{T["succ.usufruit.p4"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500"></span><span data-i18n="succ.usufruit.p5">{T["succ.usufruit.p5"]}</span></li>
+    </ul>
+  </section>
+
+  <!-- ─── Optimisation successorale ─── -->
+  <section class="rounded-xl border border-rose-800/40 bg-rose-950/20 p-6">
+    <h2 class="mb-4 flex items-center gap-2 text-xl font-semibold text-rose-300" data-i18n="succ.optim.title">
+      <svg class="h-5 w-5 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+      </svg>
+      {T["succ.optim.title"]}
+    </h2>
+    <SourceLinks links={sources.reserve} label={isFr ? 'Sources officielles' : 'Official sources'} />
+    <ul class="space-y-2 text-base text-slate-400">
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span><span data-i18n="succ.optim.p1">{T["succ.optim.p1"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span><span data-i18n="succ.optim.p2">{T["succ.optim.p2"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span><span data-i18n="succ.optim.p3">{T["succ.optim.p3"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span><span data-i18n="succ.optim.p4">{T["succ.optim.p4"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span><span data-i18n="succ.optim.p5">{T["succ.optim.p5"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span><span data-i18n="succ.optim.p6">{T["succ.optim.p6"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span><span data-i18n="succ.optim.p7">{T["succ.optim.p7"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span><span data-i18n="succ.optim.p8">{T["succ.optim.p8"]}</span></li>
+    </ul>
+  </section>
+
+</div>
+
+</BaseLayout>

@@ -1,0 +1,3 @@
+[     272ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:4321/favicon.svg:0
+[     290ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ http://localhost:4321/node_modules/.vite/deps/chunk-LPF6KSF2.js?v=8c4216d4:21608
+[    5683ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ http://localhost:4321/node_modules/.vite/deps/chunk-LPF6KSF2.js?v=8c4216d4:21608

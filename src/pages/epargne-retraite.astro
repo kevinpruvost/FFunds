@@ -12,32 +12,34 @@ const isFr = lang === 'fr';
 
 <div class="mb-8">
   <h1 class="text-2xl font-bold text-slate-50" data-i18n="per.title">{T["per.title"]}</h1>
-  <p class="mt-1 text-sm text-slate-400" data-i18n="per.subtitle">{T["per.subtitle"]}</p>
+  <p class="mt-1 text-base text-slate-400" data-i18n="per.subtitle">{T["per.subtitle"]}</p>
 </div>
 
 <div class="max-w-4xl space-y-10">
 
   <!-- ─── What is PER ─── -->
   <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-6">
-    <h2 class="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-100" data-i18n="per.what.title">
+    <h2 class="mb-4 flex items-center gap-2 text-xl font-semibold text-slate-100" data-i18n="per.what.title">
       <svg class="h-5 w-5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
       </svg>
       {T["per.what.title"]}
     </h2>
-    <p class="mb-3 text-sm text-slate-400 leading-relaxed" data-i18n="per.what.p1">{T["per.what.p1"]}</p>
-    <p class="text-sm text-slate-400 leading-relaxed" data-i18n="per.what.p2">{T["per.what.p2"]}</p>
+    <ul class="space-y-2 text-base text-slate-400">
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500"></span><span data-i18n="per.what.p1">{T["per.what.p1"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500"></span><span data-i18n="per.what.p2">{T["per.what.p2"]}</span></li>
+    </ul>
   </section>
 
   <!-- ─── Why it's a trap ─── -->
   <section class="rounded-xl border border-red-900/40 bg-red-950/20 p-6">
-    <h2 class="mb-4 flex items-center gap-2 text-lg font-semibold text-red-300" data-i18n="per.trap.title">
+    <h2 class="mb-4 flex items-center gap-2 text-xl font-semibold text-red-300" data-i18n="per.trap.title">
       <svg class="h-5 w-5 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
       </svg>
       {T["per.trap.title"]}
     </h2>
-    <ul class="space-y-3 text-sm text-slate-400">
+    <ul class="space-y-3 text-base text-slate-400">
       <li class="flex gap-3">
         <span class="mt-0.5 shrink-0 text-red-400 font-bold">⚠</span>
         <span data-i18n="per.trap.lockin">{T["per.trap.lockin"]}</span>
@@ -63,7 +65,7 @@ const isFr = lang === 'fr';
 
   <!-- ─── Best PER contracts ─── -->
   <section>
-    <h2 class="mb-3 text-lg font-semibold text-slate-100" data-i18n="per.best.title">{T["per.best.title"]}</h2>
+    <h2 class="mb-3 text-xl font-semibold text-slate-100" data-i18n="per.best.title">{T["per.best.title"]}</h2>
     <p class="mb-5 text-xs text-amber-400/80 bg-amber-500/5 border border-amber-500/20 rounded-lg p-3 leading-relaxed" data-i18n="per.best.note">{T["per.best.note"]}</p>
 
     <div class="overflow-x-auto rounded-xl border border-slate-800">
@@ -170,8 +172,60 @@ const isFr = lang === 'fr';
 
   <!-- ─── Summary ─── -->
   <section class="rounded-xl border border-blue-800/40 bg-blue-950/20 p-6">
-    <h2 class="mb-3 text-lg font-semibold text-blue-300" data-i18n="per.summary.title">{T["per.summary.title"]}</h2>
-    <p class="text-sm text-slate-400 leading-relaxed" data-i18n="per.summary.p">{T["per.summary.p"]}</p>
+    <h2 class="mb-3 text-xl font-semibold text-blue-300" data-i18n="per.summary.title">{T["per.summary.title"]}</h2>
+    <p class="text-base text-slate-400 leading-relaxed" data-i18n="per.summary.p">{T["per.summary.p"]}</p>
+  </section>
+
+  <!-- ─── Fiscalité ─── -->
+  <section class="rounded-xl border border-purple-800/40 bg-purple-950/20 p-6">
+    <h2 class="mb-4 flex items-center gap-2 text-xl font-semibold text-purple-300" data-i18n="per.tax.title">
+      <svg class="h-5 w-5 text-purple-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      {T["per.tax.title"]}
+    </h2>
+
+    <!-- Contributions / Entry deduction -->
+    <h3 class="mb-3 text-base font-semibold text-slate-200" data-i18n="per.tax.entry.title">{T["per.tax.entry.title"]}</h3>
+    <ul class="mb-5 space-y-2 text-base text-slate-400">
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-500"></span><span data-i18n="per.tax.entry.1">{T["per.tax.entry.1"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-500"></span><span data-i18n="per.tax.entry.2">{T["per.tax.entry.2"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-500"></span><span data-i18n="per.tax.entry.3">{T["per.tax.entry.3"]}</span></li>
+    </ul>
+
+    <!-- Capital withdrawal -->
+    <h3 class="mb-3 text-base font-semibold text-slate-200" data-i18n="per.tax.exit.title">{T["per.tax.exit.title"]}</h3>
+    <ul class="mb-5 space-y-2 text-base text-slate-400">
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-500"></span><span data-i18n="per.tax.exit.1">{T["per.tax.exit.1"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-500"></span><span data-i18n="per.tax.exit.2">{T["per.tax.exit.2"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400"></span><span data-i18n="per.tax.exit.3">{T["per.tax.exit.3"]}</span></li>
+    </ul>
+
+    <!-- Annuity -->
+    <h3 class="mb-3 text-base font-semibold text-slate-200" data-i18n="per.tax.rente.title">{T["per.tax.rente.title"]}</h3>
+    <ul class="mb-5 space-y-2 text-base text-slate-400">
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-500"></span><span data-i18n="per.tax.rente.1">{T["per.tax.rente.1"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-500"></span><span data-i18n="per.tax.rente.2">{T["per.tax.rente.2"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-500"></span><span data-i18n="per.tax.rente.3">{T["per.tax.rente.3"]}</span></li>
+    </ul>
+
+    <!-- Inheritance -->
+    <h3 class="mb-3 text-base font-semibold text-slate-200" data-i18n="per.tax.succession.title">{T["per.tax.succession.title"]}</h3>
+    <ul class="mb-5 space-y-2 text-base text-slate-400">
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-500"></span><span data-i18n="per.tax.succession.1">{T["per.tax.succession.1"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-500"></span><span data-i18n="per.tax.succession.2">{T["per.tax.succession.2"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple-500"></span><span data-i18n="per.tax.succession.3">{T["per.tax.succession.3"]}</span></li>
+    </ul>
+
+    <!-- Optimization -->
+    <h3 class="mb-3 text-base font-semibold text-slate-200" data-i18n="per.tax.optim.title">{T["per.tax.optim.title"]}</h3>
+    <ul class="space-y-2 text-base text-slate-400">
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span><span data-i18n="per.tax.optim.1">{T["per.tax.optim.1"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span><span data-i18n="per.tax.optim.2">{T["per.tax.optim.2"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span><span data-i18n="per.tax.optim.3">{T["per.tax.optim.3"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span><span data-i18n="per.tax.optim.4">{T["per.tax.optim.4"]}</span></li>
+      <li class="flex gap-2"><span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span><span data-i18n="per.tax.optim.5">{T["per.tax.optim.5"]}</span></li>
+    </ul>
   </section>
 
 </div>

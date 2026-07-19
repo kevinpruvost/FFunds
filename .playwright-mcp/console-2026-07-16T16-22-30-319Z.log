@@ -1,0 +1,6 @@
+[     121ms] [INFO] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold @ http://localhost:4321/node_modules/.vite/deps/chunk-LPF6KSF2.js?v=869ad905:21608
+[     132ms] [ERROR] Warning: Invalid DOM property `%s`. Did you mean `%s`?%s class className 
+    at h2
+    at div
+    at section
+    at SuccessionCalculator (http://localhost:4321/src/components/SuccessionCalculator.tsx:30:48) @ http://localhost:4321/node_modules/.vite/deps/chunk-LPF6KSF2.js?v=869ad905:520
