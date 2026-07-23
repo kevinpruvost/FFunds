@@ -1,6 +1,7 @@
 [
   { "ticker": "SPY",  "name": "S&P 500",                 "class": "actions-us",        "color": "#60a5fa" },
   { "ticker": "QQQ",  "name": "Nasdaq 100",              "class": "actions-us",        "color": "#a78bfa" },
+  { "ticker": "QLD",  "name": "Nasdaq 100 2x Lev.",       "class": "actions-us",        "color": "#c084fc" },
   { "ticker": "IWM",  "name": "Russell 2000",            "class": "actions-us",        "color": "#34d399" },
   { "ticker": "EFA",  "name": "Grandes Cap. Intl",       "class": "actions-intl",      "color": "#f472b6" },
   { "ticker": "SCZ",  "name": "Petites Cap. Intl",       "class": "actions-intl",      "color": "#fb923c" },
@@ -22,5 +23,6 @@
   { "ticker": "MSCI-WORLD-SMALL", "name": "MSCI World Small Cap", "class": "indices-monde", "color": "#a7f3d0", "csv": "world_small_cap.csv" },
   { "ticker": "^GSPC", "name": "S&P 500 (index brut)",   "class": "actions-us",        "color": "#93c5fd" },
   { "ticker": "^TNX", "name": "10y Treasury Yield",     "class": "obligations",       "color": "#a5b4fc" },
-  { "ticker": "^VIX", "name": "VIX",                     "class": "alternatif",       "color": "#fca5a5" }
+  { "ticker": "^VIX", "name": "VIX",                     "class": "alternatif",       "color": "#fca5a5" },
+  { "ticker": "CASH", "name": "Cash",                    "class": "cash",             "color": "#cbd5e1" }
 ]

@@ -28,6 +28,7 @@ import {
   Cell,
   ComposedChart,
   Line,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -85,6 +86,14 @@ interface SimulationInput {
   // marginRebalanceMode.
   marginRebalance: boolean;
   marginRebalanceMode: "gains-only" | "bidirectional";
+  inflationPct: number;
+  // Time window filter. "all" = full available data (default, no limit),
+  // "lastN" = keep only the last N years of the available period,
+  // "custom" = explicit [customStart, customEnd] month range (YYYY-MM).
+  windowMode: "all" | "lastN" | "custom";
+  yearsBack: number;
+  customStart: string; // "" = no lower bound
+  customEnd: string;   // "" = no upper bound
 }
 
 interface BacktestResult {
@@ -100,6 +109,14 @@ interface BacktestResult {
   equityValue: number[];
   invested: number[];
   drawdown: number[];
+  // Real (inflation-adjusted) equity values, same length as equityValue.
+  // Each entry i is discounted from its month index: real_i = equity_i / (1+infl)^(i/12).
+  equityValueReal: number[];
+  investedReal: number[];
+  finalValueReal: number;
+  totalInvestedReal: number;
+  inflationPct: number;
+  realCagr: number;
   finalValue: number;
   totalInvested: number;
   cagr: number;
@@ -107,11 +124,11 @@ interface BacktestResult {
   maxDrawdown: number;
   sharpe: number;
   sortino: number;
-  // Margin loan state (zero/empty-equivalent when margin is disabled).
   marginEnabled: boolean;
   marginLeverage: number;
   loanAmount: number;
   loanAmountSeries: number[];
+  interestPaidSeries: number[];
   totalInterestPaid: number;
   liquidationMonth: string | null;
 }
@@ -168,6 +185,27 @@ const PRESETS: Record<string, Record<string, number>> = {
     EEM: 10,
     "BTC-USD": 15,
   },
+  "golden-2x": {
+    "MSCI-WORLD-MOMENTUM": 20,
+    "MSCI-WORLD-SMALL": 20,
+    XLU: 10,
+    TLT: 19,
+    SHY: 6,
+    KMLM: 10,
+    GLD: 15,
+  },
+  "golden-3x": {
+    "MSCI-WORLD-MOMENTUM": 20,
+    "MSCI-WORLD-SMALL": 20,
+    XLU: 10,
+    TLT: 19,
+    SHY: 6,
+    KMLM: 10,
+    GLD: 15,
+  },
+  "nasdaq-2x": {
+    QLD: 100,
+  },
 };
 
 const CLASS_KEYS: Record<string, string> = {
@@ -180,6 +218,7 @@ const CLASS_KEYS: Record<string, string> = {
   crypto: "alloc.classLabel.crypto",
   alternatif: "alloc.classLabel.alternatif",
   "indices-monde": "alloc.classLabel.indices-monde",
+  cash: "alloc.classLabel.cash",
 };
 
 /* ─────────────────────────── Utilities ─────────────────────────── */
@@ -258,6 +297,7 @@ function intersectPeriod(prices: PricesMap, tickers: string[]) {
   let limitingTicker = "";
 
   for (const t of tickers) {
+    if (t === "CASH") continue;
     const hist = prices[t];
     if (!hist) continue;
     if (maxStart === "" || hist.startDate > maxStart) {
@@ -281,6 +321,12 @@ function intersectPeriod(prices: PricesMap, tickers: string[]) {
   }
 
   const lookups = tickers.map((t) => {
+    if (t === "CASH") {
+      return new Proxy({} as Record<string, number>, {
+        get: () => 1,
+        has: () => true,
+      });
+    }
     const map: Record<string, number> = {};
     const hist = prices[t];
     if (hist) {
@@ -307,11 +353,35 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
     marginInterestFreq,
     marginRebalance,
     marginRebalanceMode,
+    inflationPct,
+    windowMode,
+    yearsBack,
+    customStart,
+    customEnd,
   } = input;
   if (tickers.length === 0) return null;
 
-  const { startMonth, endMonth, limitingTicker, limitingTickerName, months, lookups } = intersectPeriod(allPrices, tickers);
-  if (months.length === 0) return null;
+  const { startMonth, endMonth, limitingTicker, limitingTickerName, months: allMonths, lookups } = intersectPeriod(allPrices, tickers);
+  if (allMonths.length === 0) return null;
+
+  // Apply time window filter on top of the ticker-intersected period.
+  // "all": no filter. "lastN": keep final N*12 months. "custom": clamp to
+  // [customStart, customEnd] (empty string = no bound on that side).
+  let months = allMonths;
+  let winStart = startMonth;
+  let winEnd = endMonth;
+  if (windowMode === "lastN" && yearsBack > 0) {
+    const cutoffIdx = Math.max(0, allMonths.length - yearsBack * 12);
+    months = allMonths.slice(cutoffIdx);
+    winStart = months[0] ?? startMonth;
+  } else if (windowMode === "custom") {
+    const lo = customStart || "";
+    const hi = customEnd || "";
+    months = allMonths.filter((m) => (lo === "" || m >= lo) && (hi === "" || m <= hi));
+    if (months.length === 0) return null;
+    winStart = months[0];
+    winEnd = months[months.length - 1];
+  }
 
   const n = tickers.length;
   const totalWeight = weights.reduce((s, w) => s + w, 0);
@@ -339,6 +409,7 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
   const loanAmountSeries: number[] = [loanAmount];
   const invested: number[] = [initialInvestment];
   const drawdown: number[] = [0];
+  const interestPaidSeries: number[] = [0];
 
   const monthlyReturns: number[] = [];
 
@@ -373,6 +444,9 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
           for (let i = 0; i < n; i++) assetValues[i] *= scale;
         }
       }
+      interestPaidSeries.push(interest);
+    } else {
+      interestPaidSeries.push(0);
     }
 
     const valueAfterMarket = assetValues.reduce((s, v) => s + v, 0);
@@ -392,6 +466,7 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
         loanAmountSeries.push(0);
         invested.push(totalInvested);
         drawdown.push(1);
+        interestPaidSeries.push(0);
       }
       break;
     }
@@ -501,9 +576,17 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
   const downsideStd = Math.sqrt(downsideVariance);
   const sortino = downsideStd > 0 ? (meanMonthly - rfMonthly) / downsideStd * Math.sqrt(12) : 0;
 
+  const inflFrac = inflationPct / 100;
+  const equityValueReal = equityValue.map((v, i) => inflFrac > 0 ? v / Math.pow(1 + inflFrac, i / 12) : v);
+  const investedReal = invested.map((v, i) => inflFrac > 0 ? v / Math.pow(1 + inflFrac, i / 12) : v);
+  const finalValueReal = equityValueReal[equityValueReal.length - 1] ?? 0;
+  const totalInvestedReal = investedReal[investedReal.length - 1] ?? 0;
+  // Real CAGR = inflation-adjusted compound growth rate.
+  const realCagr = inflFrac > 0 ? (1 + cagr) / (1 + inflFrac) - 1 : cagr;
+
   return {
-    startMonth,
-    endMonth,
+    startMonth: winStart,
+    endMonth: winEnd,
     limitingTicker,
     limitingTickerName,
     months,
@@ -511,6 +594,12 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
     equityValue,
     invested,
     drawdown,
+    equityValueReal,
+    investedReal,
+    finalValueReal,
+    totalInvestedReal,
+    inflationPct,
+    realCagr,
     finalValue,
     totalInvested,
     cagr,
@@ -522,6 +611,7 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
     marginLeverage: safeLeverage,
     loanAmount: initialLoan,
     loanAmountSeries,
+    interestPaidSeries,
     totalInterestPaid,
     liquidationMonth,
   };
@@ -534,7 +624,7 @@ function PortfolioAllocatorInner(): JSX.Element {
   const [selectedTickers, setSelectedTickers] = useState<string[]>(["SPY", "SHY"]);
   const [weights, setWeights] = useState<Record<string, number>>({ SPY: 60, SHY: 40 });
   const [locked, setLocked] = useState<Record<string, boolean>>({});
-  const [autoNormalize, setAutoNormalize] = useState<boolean>(true);
+  const [autoNormalize, setAutoNormalize] = useState<boolean>(false);
 
   const [initialInvestment, setInitialInvestment] = useState<number>(100000);
   const [monthlyContribution, setMonthlyContribution] = useState<number>(500);
@@ -546,6 +636,13 @@ function PortfolioAllocatorInner(): JSX.Element {
   const [marginInterestFreq, setMarginInterestFreq] = useState<SimulationInput["marginInterestFreq"]>("monthly");
   const [marginRebalance, setMarginRebalance] = useState<boolean>(true);
   const [marginRebalanceMode, setMarginRebalanceMode] = useState<SimulationInput["marginRebalanceMode"]>("gains-only");
+
+  const [inflationPct, setInflationPct] = useState<number>(2.5);
+
+  const [windowMode, setWindowMode] = useState<SimulationInput["windowMode"]>("all");
+  const [yearsBack, setYearsBack] = useState<number>(10);
+  const [customStart, setCustomStart] = useState<string>("");
+  const [customEnd, setCustomEnd] = useState<string>("");
 
   // Custom tickers state
   const [customTickers, setCustomTickers] = useState<Record<string, CustomTicker>>({});
@@ -593,6 +690,11 @@ function PortfolioAllocatorInner(): JSX.Element {
         marginInterestFreq: SimulationInput["marginInterestFreq"];
         marginRebalance: boolean;
         marginRebalanceMode: SimulationInput["marginRebalanceMode"];
+        inflationPct: number;
+        windowMode: SimulationInput["windowMode"];
+        yearsBack: number;
+        customStart: string;
+        customEnd: string;
       }>;
       if (Array.isArray(data.selectedTickers) && data.selectedTickers.length > 0) {
         setSelectedTickers(data.selectedTickers);
@@ -609,6 +711,11 @@ function PortfolioAllocatorInner(): JSX.Element {
       if (data.marginInterestFreq) setMarginInterestFreq(data.marginInterestFreq);
       if (typeof data.marginRebalance === "boolean") setMarginRebalance(data.marginRebalance);
       if (data.marginRebalanceMode) setMarginRebalanceMode(data.marginRebalanceMode);
+      if (typeof data.inflationPct === "number") setInflationPct(data.inflationPct);
+      if (data.windowMode === "all" || data.windowMode === "lastN" || data.windowMode === "custom") setWindowMode(data.windowMode);
+      if (typeof data.yearsBack === "number") setYearsBack(data.yearsBack);
+      if (typeof data.customStart === "string") setCustomStart(data.customStart);
+      if (typeof data.customEnd === "string") setCustomEnd(data.customEnd);
     } catch {
       // ignore corrupt cookie
     }
@@ -628,6 +735,11 @@ function PortfolioAllocatorInner(): JSX.Element {
       marginInterestFreq,
       marginRebalance,
       marginRebalanceMode,
+      inflationPct,
+      windowMode,
+      yearsBack,
+      customStart,
+      customEnd,
     };
     const value = encodeURIComponent(JSON.stringify(data));
     document.cookie = `${PA_COOKIE_NAME}=${value}; max-age=${PA_COOKIE_MAX_AGE}; path=/; SameSite=Lax`;
@@ -643,6 +755,11 @@ function PortfolioAllocatorInner(): JSX.Element {
     marginInterestFreq,
     marginRebalance,
     marginRebalanceMode,
+    inflationPct,
+    windowMode,
+    yearsBack,
+    customStart,
+    customEnd,
   ]);
 
   // Build merged prices map (static + custom)
@@ -687,8 +804,13 @@ function PortfolioAllocatorInner(): JSX.Element {
       marginInterestFreq,
       marginRebalance,
       marginRebalanceMode,
+      inflationPct,
+      windowMode,
+      yearsBack,
+      customStart,
+      customEnd,
     }),
-    [selectedTickers, weightArray, initialInvestment, monthlyContribution, rebalance, marginEnabled, marginLeverage, marginLoanRatePct, marginInterestFreq, marginRebalance, marginRebalanceMode]
+    [selectedTickers, weightArray, initialInvestment, monthlyContribution, rebalance, marginEnabled, marginLeverage, marginLoanRatePct, marginInterestFreq, marginRebalance, marginRebalanceMode, inflationPct, windowMode, yearsBack, customStart, customEnd]
   );
 
   const deferredInput = useDeferredValue(simulationInput);
@@ -784,6 +906,21 @@ function PortfolioAllocatorInner(): JSX.Element {
     const tickers = Object.keys(preset);
     setSelectedTickers(tickers);
     setWeights({ ...preset });
+
+    // Leverage presets: enable margin with appropriate leverage and 4% loan rate.
+    if (presetKey === "golden-2x") {
+      setMarginEnabled(true);
+      setMarginLeverage(2);
+      setMarginLoanRatePct(4);
+    } else if (presetKey === "golden-3x") {
+      setMarginEnabled(true);
+      setMarginLeverage(3);
+      setMarginLoanRatePct(4);
+    } else if (presetKey === "nasdaq-2x") {
+      setMarginEnabled(false);
+      setMarginLeverage(1);
+      setMarginLoanRatePct(5);
+    }
   }, [selectedTickers]);
 
   const fetchCustomTicker = useCallback(async (ticker: string) => {
@@ -935,7 +1072,9 @@ function PortfolioAllocatorInner(): JSX.Element {
       month: result.months[i],
       value: v,
       equity: result.equityValue[i],
+      equityReal: result.equityValueReal[i],
       invested: result.invested[i],
+      investedReal: result.investedReal[i],
       loan: result.loanAmountSeries[i],
     }));
   }, [result]);
@@ -958,6 +1097,54 @@ function PortfolioAllocatorInner(): JSX.Element {
       };
     });
   }, [selectedTickers, weights, allTickers]);
+
+  const yearlyChartData = useMemo(() => {
+    if (!result) return [];
+    const inflFrac = result.inflationPct / 100;
+    const buckets: Record<string, {
+      year: string;
+      invested: number;
+      investedReal: number;
+      equityStart: number;
+      equityEnd: number;
+      equityEndReal: number;
+      interest: number;
+      gain: number;
+      gainReal: number;
+      firstIdx: number;
+    }> = {};
+    for (let i = 0; i < result.months.length; i++) {
+      const y = result.months[i].slice(0, 4);
+      if (!buckets[y]) {
+        buckets[y] = {
+          year: y,
+          invested: 0,
+          investedReal: 0,
+          equityStart: i > 0 ? result.equityValue[i - 1] : result.equityValue[i],
+          equityEnd: result.equityValue[i],
+          equityEndReal: result.equityValueReal[i],
+          interest: 0,
+          gain: 0,
+          gainReal: 0,
+          firstIdx: i,
+        };
+      }
+      const b = buckets[y];
+      b.equityEnd = result.equityValue[i];
+      b.equityEndReal = result.equityValueReal[i];
+      b.interest += result.interestPaidSeries[i] ?? 0;
+      if (i > 0) {
+        b.invested += result.invested[i] - result.invested[i - 1];
+        b.investedReal += (result.investedReal[i] ?? 0) - (result.investedReal[i - 1] ?? 0);
+      }
+    }
+    const years = Object.values(buckets).sort((a, b) => a.year.localeCompare(b.year));
+    for (const y of years) {
+      y.gain = y.equityEnd - y.equityStart - y.invested;
+      y.gainReal = y.equityEndReal - y.equityStart - y.investedReal;
+    }
+    return years;
+  }, [result]);
 
   // Group tickers by class for the picker
   const groupedTickers = useMemo(() => {
@@ -1002,15 +1189,58 @@ function PortfolioAllocatorInner(): JSX.Element {
           <div key={i} className="text-tremor-content dark:text-slate-400 text-xs">
             {p.dataKey === "value" && `${t("alloc.chart.value")}: ${formatEUR(p.value, lang)}`}
             {p.dataKey === "equity" && `${t("alloc.chart.equity")}: ${formatEUR(p.value, lang)}`}
+            {p.dataKey === "equityReal" && `${t("alloc.chart.equityLabel")} (${t("alloc.real.suffix")}): ${formatEUR(p.value, lang)}`}
             {p.dataKey === "invested" && `${t("alloc.chart.invested")}: ${formatEUR(p.value, lang)}`}
+            {p.dataKey === "investedReal" && `${t("alloc.chart.invested")} (${t("alloc.real.suffix")}): ${formatEUR(p.value, lang)}`}
             {p.dataKey === "loan" && `${t("alloc.chart.loan")}: ${formatEUR(p.value, lang)}`}
             {p.dataKey === "drawdown" && `${t("alloc.chart.drawdownLabel")}: ${p.value.toFixed(1)} %`}
             {p.dataKey === "allocation" && `${p.value.toFixed(1)} %`}
+            {p.dataKey === "gain" && `${t("alloc.chart.gain")}: ${formatEUR(p.value, lang)}`}
+            {p.dataKey === "gainReal" && `${t("alloc.chart.gain")} (${t("alloc.real.suffix")}): ${formatEUR(p.value, lang)}`}
+            {p.dataKey === "interest" && `${t("alloc.metrics.interestPaid")}: ${formatEUR(p.value, lang)}`}
+            {p.dataKey === "equityEnd" && `${t("alloc.metrics.finalValue")}: ${formatEUR(p.value, lang)}`}
+            {p.dataKey === "equityEndReal" && `${t("alloc.metrics.finalValueReal")}: ${formatEUR(p.value, lang)}`}
           </div>
         ))}
       </div>
     );
   };
+
+  const LabelWithHelp = ({ labelKey, helpKey, children }: { labelKey: string; helpKey: string; children?: React.ReactNode }) => (
+    <div className="group relative inline-block w-full">
+      <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1 cursor-help">{t(labelKey)}</Text>
+      {children}
+      <div className="pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-64 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
+        {t(helpKey)}
+      </div>
+    </div>
+  );
+
+  const MetricCard = ({
+    labelKey,
+    helpKey,
+    children,
+    cardClass = "",
+    metricClass = "",
+  }: {
+    labelKey: string;
+    helpKey: string;
+    children: React.ReactNode;
+    cardClass?: string;
+    metricClass?: string;
+  }) => (
+    <Col>
+      <div className="group relative">
+        <Card className={`bg-slate-800/50 border-slate-700/50 p-3 cursor-help ${cardClass}`}>
+          <Text className="text-tremor-content dark:text-slate-400 text-xs">{t(labelKey)}</Text>
+          <Metric className={`text-lg ${metricClass}`}>{children}</Metric>
+        </Card>
+        <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-64 -translate-x-1/2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
+          {t(helpKey)}
+        </div>
+      </div>
+    </Col>
+  );
 
   return (
     <div className="dark space-y-6">
@@ -1076,11 +1306,11 @@ function PortfolioAllocatorInner(): JSX.Element {
                   <Text className="text-tremor-content dark:text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1.5">
                     {t(CLASS_KEYS[cls] ?? `alloc.classLabel.${cls}`)}
                   </Text>
-                  <Grid numItems={2} numItemsSm={3} className="gap-2">
+                   <Grid numItems={2} numItemsSm={3} className="gap-2">
                     {list.map((t) => {
                       const isSelected = selectedTickers.includes(t.ticker);
                       const isCustom = customTickers[t.ticker] !== undefined;
-                      return (
+  return (
                         <button
                           key={t.ticker}
                           type="button"
@@ -1376,6 +1606,15 @@ function PortfolioAllocatorInner(): JSX.Element {
                 <Button size="xs" variant="secondary" onClick={() => applyPreset("aggressive")} className="bg-slate-800 text-slate-300 hover:bg-slate-700">
                   {t("alloc.preset.aggressive")}
                 </Button>
+                <Button size="xs" variant="secondary" onClick={() => applyPreset("golden-2x")} className="bg-slate-800 text-slate-300 hover:bg-slate-700">
+                  {t("alloc.preset.golden2x")}
+                </Button>
+                <Button size="xs" variant="secondary" onClick={() => applyPreset("golden-3x")} className="bg-slate-800 text-slate-300 hover:bg-slate-700">
+                  {t("alloc.preset.golden3x")}
+                </Button>
+                <Button size="xs" variant="secondary" onClick={() => applyPreset("nasdaq-2x")} className="bg-slate-800 text-slate-300 hover:bg-slate-700">
+                  {t("alloc.preset.nasdaq2x")}
+                </Button>
               </div>
             </Card>
           )}
@@ -1405,30 +1644,53 @@ function PortfolioAllocatorInner(): JSX.Element {
                 />
               </Col>
               <Col>
-                <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">{t("alloc.col.config.rebalance")}</Text>
-                <Select value={rebalance} onValueChange={(v) => setRebalance(v as SimulationInput["rebalance"])} className="bg-slate-900 border-slate-800 text-slate-200">
-                  <SelectItem value="none">{t("alloc.col.config.rebalance.none")}</SelectItem>
-                  <SelectItem value="monthly">{t("alloc.col.config.rebalance.monthly")}</SelectItem>
-                  <SelectItem value="quarterly">{t("alloc.col.config.rebalance.quarterly")}</SelectItem>
-                  <SelectItem value="annual">{t("alloc.col.config.rebalance.annual")}</SelectItem>
-                  <SelectItem value="threshold5">{t("alloc.col.config.rebalance.threshold5")}</SelectItem>
-                  <SelectItem value="bands5_25">{t("alloc.col.config.rebalance.bands5_25")}</SelectItem>
-                </Select>
+                <LabelWithHelp labelKey="alloc.col.config.rebalance" helpKey="alloc.col.config.rebalance.help">
+                  <Select value={rebalance} onValueChange={(v) => setRebalance(v as SimulationInput["rebalance"])} className="bg-slate-900 border-slate-800 text-slate-200">
+                    <SelectItem value="none">{t("alloc.col.config.rebalance.none")}</SelectItem>
+                    <SelectItem value="monthly">{t("alloc.col.config.rebalance.monthly")}</SelectItem>
+                    <SelectItem value="quarterly">{t("alloc.col.config.rebalance.quarterly")}</SelectItem>
+                    <SelectItem value="annual">{t("alloc.col.config.rebalance.annual")}</SelectItem>
+                    <SelectItem value="threshold5">{t("alloc.col.config.rebalance.threshold5")}</SelectItem>
+                    <SelectItem value="bands5_25">{t("alloc.col.config.rebalance.bands5_25")}</SelectItem>
+                  </Select>
+                </LabelWithHelp>
+              </Col>
+              <Col>
+                <LabelWithHelp labelKey="alloc.col.config.inflation" helpKey="alloc.col.config.inflation.help">
+                  <NumberInput
+                    value={inflationPct}
+                    onValueChange={(v) => setInflationPct(Math.max(0, Math.min(20, v ?? 0)))}
+                    min={0}
+                    max={20}
+                    step={0.1}
+                    className="bg-slate-900 border-slate-800 text-slate-200"
+                  />
+                </LabelWithHelp>
               </Col>
             </Grid>
 
             {/* Margin loan */}
             <div className="mt-5 pt-4 border-t border-slate-700/50">
-              <div className="flex items-center justify-between mb-3">
-                <Title className="text-tremor-content-strong dark:text-slate-100 text-base">{t("alloc.col.config.margin.title")}</Title>
-                <Button
-                  size="xs"
-                  variant={marginEnabled ? "primary" : "secondary"}
-                  onClick={() => setMarginEnabled((v) => !v)}
-                  className={marginEnabled ? "bg-tremor-brand dark:bg-emerald-600 text-white" : "bg-slate-800 text-slate-300"}
-                >
-                  {t("alloc.col.config.margin.title")} : {marginEnabled ? "ON" : "OFF"}
-                </Button>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="group relative inline-block">
+                    <Title className="text-tremor-content-strong dark:text-slate-100 text-base cursor-help">{t("alloc.col.config.margin.title")}</Title>
+                    <div className="pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-64 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
+                      {t("alloc.col.config.margin.title.help")}
+                    </div>
+                  </div>
+                <div className="group relative inline-block">
+                    <Button
+                      size="xs"
+                      variant={marginEnabled ? "primary" : "secondary"}
+                      onClick={() => setMarginEnabled((v) => !v)}
+                      className={marginEnabled ? "bg-tremor-brand dark:bg-emerald-600 text-white" : "bg-slate-800 text-slate-300"}
+                    >
+                      {t("alloc.col.config.margin.title")} : {marginEnabled ? "ON" : "OFF"}
+                    </Button>
+                    <div className="pointer-events-none absolute bottom-full right-0 z-20 mb-2 w-64 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
+                      {t("alloc.col.config.margin.title.help")}
+                    </div>
+                  </div>
               </div>
               {marginEnabled && (
                 <>
@@ -1437,51 +1699,64 @@ function PortfolioAllocatorInner(): JSX.Element {
                   </Text>
                   <Grid numItems={1} numItemsSm={3} className="gap-4">
                     <Col>
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">{t("alloc.col.config.margin.leverage")}</Text>
-                      <NumberInput
-                        value={marginLeverage}
-                        onValueChange={(v) => setMarginLeverage(Math.max(1, Math.min(5, v ?? 1)))}
-                        min={1}
-                        max={5}
-                        step={0.1}
-                        className="bg-slate-900 border-slate-800 text-slate-200"
-                      />
+                      <LabelWithHelp labelKey="alloc.col.config.margin.leverage" helpKey="alloc.col.config.margin.leverage.help">
+                        <NumberInput
+                          value={marginLeverage}
+                          onValueChange={(v) => setMarginLeverage(Math.max(1, Math.min(5, v ?? 1)))}
+                          min={1}
+                          max={5}
+                          step={0.1}
+                          className="bg-slate-900 border-slate-800 text-slate-200"
+                        />
+                      </LabelWithHelp>
                     </Col>
                     <Col>
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">{t("alloc.col.config.margin.rate")}</Text>
-                      <NumberInput
-                        value={marginLoanRatePct}
-                        onValueChange={(v) => setMarginLoanRatePct(Math.max(0, Math.min(50, v ?? 0)))}
-                        min={0}
-                        max={50}
-                        step={0.1}
-                        className="bg-slate-900 border-slate-800 text-slate-200"
-                      />
+                      <LabelWithHelp labelKey="alloc.col.config.margin.rate" helpKey="alloc.col.config.margin.rate.help">
+                        <NumberInput
+                          value={marginLoanRatePct}
+                          onValueChange={(v) => setMarginLoanRatePct(Math.max(0, Math.min(50, v ?? 0)))}
+                          min={0}
+                          max={50}
+                          step={0.1}
+                          className="bg-slate-900 border-slate-800 text-slate-200"
+                        />
+                      </LabelWithHelp>
                     </Col>
                     <Col>
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">{t("alloc.col.config.margin.freq")}</Text>
-                      <Select
-                        value={marginInterestFreq}
-                        onValueChange={(v) => setMarginInterestFreq(v as SimulationInput["marginInterestFreq"])}
-                        className="bg-slate-900 border-slate-800 text-slate-200"
-                      >
-                        <SelectItem value="monthly">{t("alloc.col.config.margin.freqMonthly")}</SelectItem>
-                        <SelectItem value="yearly">{t("alloc.col.config.margin.freqYearly")}</SelectItem>
-                      </Select>
+                      <LabelWithHelp labelKey="alloc.col.config.margin.freq" helpKey="alloc.col.config.margin.freq.help">
+                        <Select
+                          value={marginInterestFreq}
+                          onValueChange={(v) => setMarginInterestFreq(v as SimulationInput["marginInterestFreq"])}
+                          className="bg-slate-900 border-slate-800 text-slate-200"
+                        >
+                          <SelectItem value="monthly">{t("alloc.col.config.margin.freqMonthly")}</SelectItem>
+                          <SelectItem value="yearly">{t("alloc.col.config.margin.freqYearly")}</SelectItem>
+                        </Select>
+                      </LabelWithHelp>
                     </Col>
                   </Grid>
 
                   <div className="mt-4 pt-3 border-t border-slate-700/50">
                     <div className="flex items-center justify-between mb-2">
-                      <Text className="text-tremor-content dark:text-slate-400 text-sm font-medium">{t("alloc.col.config.margin.relevTitle")}</Text>
-                      <Button
-                        size="xs"
-                        variant={marginRebalance ? "primary" : "secondary"}
-                        onClick={() => setMarginRebalance((v) => !v)}
-                        className={marginRebalance ? "bg-tremor-brand dark:bg-emerald-600 text-white" : "bg-slate-800 text-slate-300"}
-                      >
-                        Re-leverage : {marginRebalance ? "ON" : "OFF"}
-                      </Button>
+                      <div className="group relative inline-block">
+                        <Text className="text-tremor-content dark:text-slate-400 text-sm font-medium cursor-help">{t("alloc.col.config.margin.relevTitle")}</Text>
+                        <div className="pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-64 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
+                          {t("alloc.col.config.margin.relevTitle.help")}
+                        </div>
+                      </div>
+                      <div className="group relative inline-block">
+                        <Button
+                          size="xs"
+                          variant={marginRebalance ? "primary" : "secondary"}
+                          onClick={() => setMarginRebalance((v) => !v)}
+                          className={marginRebalance ? "bg-tremor-brand dark:bg-emerald-600 text-white" : "bg-slate-800 text-slate-300"}
+                        >
+                          Re-leverage : {marginRebalance ? "ON" : "OFF"}
+                        </Button>
+                        <div className="pointer-events-none absolute bottom-full right-0 z-20 mb-2 w-64 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
+                          {t("alloc.col.config.margin.relevTitle.help")}
+                        </div>
+                      </div>
                     </div>
                     {marginRebalance && (
                       <>
@@ -1489,15 +1764,16 @@ function PortfolioAllocatorInner(): JSX.Element {
                           {t("alloc.col.config.margin.relevExplain")}
                         </Text>
                         <div className="max-w-xs">
-                          <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">{t("alloc.col.config.margin.relevModeLabel")}</Text>
-                          <Select
-                            value={marginRebalanceMode}
-                            onValueChange={(v) => setMarginRebalanceMode(v as SimulationInput["marginRebalanceMode"])}
-                            className="bg-slate-900 border-slate-800 text-slate-200"
-                          >
-                            <SelectItem value="gains-only">{t("alloc.col.config.margin.relevModeGains")}</SelectItem>
-                            <SelectItem value="bidirectional">{t("alloc.col.config.margin.relevModeBi")}</SelectItem>
-                          </Select>
+                          <LabelWithHelp labelKey="alloc.col.config.margin.relevModeLabel" helpKey="alloc.col.config.margin.relevModeLabel.help">
+                            <Select
+                              value={marginRebalanceMode}
+                              onValueChange={(v) => setMarginRebalanceMode(v as SimulationInput["marginRebalanceMode"])}
+                              className="bg-slate-900 border-slate-800 text-slate-200"
+                            >
+                              <SelectItem value="gains-only">{t("alloc.col.config.margin.relevModeGains")}</SelectItem>
+                              <SelectItem value="bidirectional">{t("alloc.col.config.margin.relevModeBi")}</SelectItem>
+                            </Select>
+                          </LabelWithHelp>
                         </div>
                       </>
                     )}
@@ -1532,65 +1808,114 @@ function PortfolioAllocatorInner(): JSX.Element {
               <>
                 {/* Metrics */}
                 <Grid numItems={2} numItemsSm={3} className="gap-3 mb-6">
-                  <Col>
-                    <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.finalValue")}</Text>
-                      <Metric className="text-tremor-content-strong dark:text-slate-100 text-lg">{formatEUR(result.finalValue, lang)}</Metric>
-                    </Card>
-                  </Col>
-                  <Col>
-                    <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.totalInvested")}</Text>
-                      <Metric className="text-tremor-content-strong dark:text-slate-100 text-lg">{formatEUR(result.totalInvested, lang)}</Metric>
-                    </Card>
-                  </Col>
-                  <Col>
-                    <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.cagr")}</Text>
-                      <Metric className="text-tremor-brand dark:text-emerald-400 text-lg">{formatPct(result.cagr * 100, 2, lang)}</Metric>
-                    </Card>
-                  </Col>
-                  <Col>
-                    <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.volatility")}</Text>
-                      <Metric className="text-tremor-content-strong dark:text-slate-100 text-lg">{formatPct(result.volatility * 100, 2, lang)}</Metric>
-                    </Card>
-                  </Col>
-                  <Col>
-                    <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.maxDrawdown")}</Text>
-                      <Metric className="text-rose-400 text-lg">{formatPct(result.maxDrawdown * 100, 2, lang)}</Metric>
-                    </Card>
-                  </Col>
-                  <Col>
-                    <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                      <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.sharpe")}</Text>
-                      <Metric className="text-tremor-brand dark:text-emerald-400 text-lg">{result.sharpe.toFixed(2)}</Metric>
-                    </Card>
-                  </Col>
+                  <MetricCard labelKey="alloc.metrics.finalValue" helpKey="alloc.metrics.finalValue.help" metricClass="text-tremor-content-strong dark:text-slate-100">
+                    {formatEUR(result.finalValue, lang)}
+                  </MetricCard>
+                  <MetricCard labelKey="alloc.metrics.totalInvested" helpKey="alloc.metrics.totalInvested.help" metricClass="text-tremor-content-strong dark:text-slate-100">
+                    {formatEUR(result.totalInvested, lang)}
+                  </MetricCard>
+                  <MetricCard labelKey="alloc.metrics.volatility" helpKey="alloc.metrics.volatility.help" metricClass="text-tremor-content-strong dark:text-slate-100">
+                    {formatPct(result.volatility * 100, 2, lang)}
+                  </MetricCard>
+                  <MetricCard labelKey="alloc.metrics.cagr" helpKey="alloc.metrics.cagr.help" metricClass="text-tremor-brand dark:text-emerald-400">
+                    {formatPct(result.cagr * 100, 2, lang)}
+                  </MetricCard>
+                  {result.inflationPct > 0 && (
+                    <MetricCard labelKey="alloc.metrics.cagrReal" helpKey="alloc.metrics.cagrReal.help" metricClass="text-teal-400">
+                      {formatPct(result.realCagr * 100, 2, lang)}
+                    </MetricCard>
+                  )}
+                  <MetricCard labelKey="alloc.metrics.maxDrawdown" helpKey="alloc.metrics.maxDrawdown.help" metricClass="text-rose-400">
+                    {formatPct(result.maxDrawdown * 100, 2, lang)}
+                  </MetricCard>
+                  <MetricCard labelKey="alloc.metrics.sharpe" helpKey="alloc.metrics.sharpe.help" metricClass="text-tremor-brand dark:text-emerald-400">
+                    {result.sharpe.toFixed(2)}
+                  </MetricCard>
+                  {result.inflationPct > 0 && (
+                    <>
+                      <MetricCard labelKey="alloc.metrics.finalValueReal" helpKey="alloc.metrics.finalValueReal.help" metricClass="text-teal-400">
+                        {formatEUR(result.finalValueReal, lang)}
+                      </MetricCard>
+                      <MetricCard labelKey="alloc.metrics.totalInvestedReal" helpKey="alloc.metrics.totalInvestedReal.help" metricClass="text-teal-400">
+                        {formatEUR(result.totalInvestedReal, lang)}
+                      </MetricCard>
+                    </>
+                  )}
                   {result.marginEnabled && (
                     <>
-                      <Col>
-                        <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                          <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.loan")}</Text>
-                          <Metric className="text-amber-400 text-lg">{formatEUR(result.loanAmount, lang)}</Metric>
-                        </Card>
-                      </Col>
-                      <Col>
-                        <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                          <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.interestPaid")}</Text>
-                          <Metric className="text-amber-400 text-lg">{formatEUR(result.totalInterestPaid, lang)}</Metric>
-                        </Card>
-                      </Col>
-                      <Col>
-                        <Card className="bg-slate-800/50 border-slate-700/50 p-3">
-                          <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.leverage")}</Text>
-                          <Metric className="text-amber-400 text-lg">{result.marginLeverage.toFixed(2)}×</Metric>
-                        </Card>
-                      </Col>
+                      <MetricCard labelKey="alloc.metrics.loan" helpKey="alloc.metrics.loan.help" metricClass="text-amber-400">
+                        {formatEUR(result.loanAmount, lang)}
+                      </MetricCard>
+                      <MetricCard labelKey="alloc.metrics.interestPaid" helpKey="alloc.metrics.interestPaid.help" metricClass="text-amber-400">
+                        {formatEUR(result.totalInterestPaid, lang)}
+                      </MetricCard>
+                      <MetricCard labelKey="alloc.metrics.leverage" helpKey="alloc.metrics.leverage.help" metricClass="text-amber-400">
+                        {result.marginLeverage.toFixed(2)}×
+                      </MetricCard>
                     </>
                   )}
                 </Grid>
+
+                {/* Time window */}
+                <div className="mb-4 pt-4 border-t border-slate-700/50">
+                  <div className="flex items-center justify-between mb-3">
+                    <Title className="text-tremor-content-strong dark:text-slate-100 text-base">{t("alloc.col.config.window.title")}</Title>
+                    <div className="flex gap-1">
+                      {(["all", "lastN", "custom"] as const).map((m) => (
+                        <Button
+                          key={m}
+                          size="xs"
+                          variant={windowMode === m ? "primary" : "secondary"}
+                          onClick={() => setWindowMode(m)}
+                          className={windowMode === m ? "bg-tremor-brand dark:bg-emerald-600 text-white" : "bg-slate-800 text-slate-300"}
+                        >
+                          {t(`alloc.col.config.window.mode.${m}`)}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  {windowMode === "lastN" && (
+                    <Col>
+                      <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">{t("alloc.col.config.window.yearsBack")}</Text>
+                      <NumberInput
+                        value={yearsBack}
+                        onValueChange={(v) => setYearsBack(Math.max(1, Math.min(50, Math.round(v ?? 1))))}
+                        min={1}
+                        max={50}
+                        step={1}
+                        className="bg-slate-900 border-slate-800 text-slate-200"
+                      />
+                    </Col>
+                  )}
+                  {windowMode === "custom" && (
+                    <Grid numItems={1} numItemsSm={2} className="gap-4">
+                      <Col>
+                        <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">{t("alloc.col.config.window.start")}</Text>
+                        <input
+                          type="date"
+                          value={customStart ? customStart + "-01" : ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setCustomStart(v ? v.slice(0, 7) : "");
+                          }}
+                          className="bg-slate-900 border border-slate-800 text-slate-200 rounded-md px-3 py-2 w-full text-sm"
+                        />
+                      </Col>
+                      <Col>
+                        <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1">{t("alloc.col.config.window.end")}</Text>
+                        <input
+                          type="date"
+                          value={customEnd ? customEnd + "-01" : ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setCustomEnd(v ? v.slice(0, 7) : "");
+                          }}
+                          className="bg-slate-900 border border-slate-800 text-slate-200 rounded-md px-3 py-2 w-full text-sm"
+                        />
+                      </Col>
+                    </Grid>
+                  )}
+                </div>
 
                 {/* Charts */}
                 <TabGroup defaultIndex={0}>
@@ -1598,6 +1923,7 @@ function PortfolioAllocatorInner(): JSX.Element {
                     <Tab className="text-slate-400 data-[selected]:text-emerald-400 data-[selected]:border-b-emerald-400">{t("alloc.chart.performance")}</Tab>
                     <Tab className="text-slate-400 data-[selected]:text-emerald-400 data-[selected]:border-b-emerald-400">{t("alloc.chart.drawdown")}</Tab>
                     <Tab className="text-slate-400 data-[selected]:text-emerald-400 data-[selected]:border-b-emerald-400">{t("alloc.chart.allocation")}</Tab>
+                    <Tab className="text-slate-400 data-[selected]:text-emerald-400 data-[selected]:border-b-emerald-400">{t("alloc.chart.yearly")}</Tab>
                   </TabList>
                   <TabPanels>
                     <TabPanel>
@@ -1641,6 +1967,17 @@ function PortfolioAllocatorInner(): JSX.Element {
                                   dot={false}
                                   activeDot={{ r: 4, fill: "#34d399" }}
                                 />
+                                {result.inflationPct > 0 && (
+                                  <Line
+                                    type="monotone"
+                                    dataKey="equityReal"
+                                    stroke="#0d9488"
+                                    strokeWidth={1.5}
+                                    strokeDasharray="1 3"
+                                    dot={false}
+                                    name={`${t("alloc.chart.equityLabel")} (${t("alloc.real.suffix")})`}
+                                  />
+                                )}
                                 <Line
                                   type="monotone"
                                   dataKey="loan"
@@ -1670,6 +2007,17 @@ function PortfolioAllocatorInner(): JSX.Element {
                                   dot={false}
                                   activeDot={{ r: 4, fill: "#34d399" }}
                                 />
+                                {result.inflationPct > 0 && (
+                                  <Line
+                                    type="monotone"
+                                    dataKey="equityReal"
+                                    stroke="#0d9488"
+                                    strokeWidth={1.5}
+                                    strokeDasharray="1 3"
+                                    dot={false}
+                                    name={`${t("alloc.chart.equityLabel")} (${t("alloc.real.suffix")})`}
+                                  />
+                                )}
                                 <Line
                                   type="monotone"
                                   dataKey="invested"
@@ -1689,6 +2037,12 @@ function PortfolioAllocatorInner(): JSX.Element {
                                 <span className="w-3 h-1 rounded-full bg-emerald-400" />
                                 <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.chart.equityLabel")}</Text>
                               </div>
+                              {result.inflationPct > 0 && (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-3 h-0.5 rounded-full" style={{ borderTop: "2px dashed #0d9488" }} />
+                                  <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.chart.equityLabel")} ({t("alloc.real.suffix")})</Text>
+                                </div>
+                              )}
                               <div className="flex items-center gap-1.5">
                                 <span className="w-3 h-1 rounded-full bg-slate-400" />
                                 <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.chart.assetsLabel")}</Text>
@@ -1708,6 +2062,12 @@ function PortfolioAllocatorInner(): JSX.Element {
                                 <span className="w-3 h-1 rounded-full bg-emerald-400" />
                                 <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.chart.valuePortfolio")}</Text>
                               </div>
+                              {result.inflationPct > 0 && (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-3 h-0.5 rounded-full" style={{ borderTop: "2px dashed #0d9488" }} />
+                                  <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.chart.valuePortfolio")} ({t("alloc.real.suffix")})</Text>
+                                </div>
+                              )}
                               <div className="flex items-center gap-1.5">
                                 <span className="w-3 h-0.5 rounded-full bg-slate-500" style={{ borderTop: "2px dashed #64748b" }} />
                                 <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.chart.invested")}</Text>
@@ -1772,6 +2132,56 @@ function PortfolioAllocatorInner(): JSX.Element {
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
+                      </div>
+                    </TabPanel>
+
+                    <TabPanel>
+                      <div className="mt-4">
+                        <Text className="text-tremor-content dark:text-slate-400 text-sm mb-2">{t("alloc.chart.yearlyDesc")}</Text>
+                        <ResponsiveContainer width="100%" height={400}>
+                          <ComposedChart data={yearlyChartData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                            <XAxis dataKey="year" tick={{ fill: "#94a3b8", fontSize: 11 }} />
+                            <YAxis tickFormatter={(v: number) => formatCompactEUR(v, lang)} tick={{ fill: "#94a3b8", fontSize: 12 }} width={80} />
+                            <Tooltip content={<CustomTooltip />} />
+                            <ReferenceLine y={0} stroke="#475569" />
+                            <Bar dataKey="invested" name={t("alloc.chart.invested")} fill="#64748b" radius={[2, 2, 0, 0]} stackId="a" />
+                            <Bar dataKey="gain" name={t("alloc.chart.gain")} radius={[2, 2, 0, 0]} stackId="a">
+                              {yearlyChartData.map((entry, index) => (
+                                <Cell key={`g-${index}`} fill={entry.gain >= 0 ? "#34d399" : "#f87171"} />
+                              ))}
+                            </Bar>
+                            <Bar dataKey="interest" name={t("alloc.metrics.interestPaid")} fill="#fbbf24" radius={[2, 2, 0, 0]} />
+                            <Bar dataKey="equityEnd" name={t("alloc.metrics.finalValue")} fill="#10b981" fillOpacity={0.15} radius={[2, 2, 0, 0]} />
+                            {result.inflationPct > 0 && (
+                              <Bar dataKey="equityEndReal" name={t("alloc.metrics.finalValueReal")} fill="#0d9488" fillOpacity={0.15} radius={[2, 2, 0, 0]} />
+                            )}
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                        <div className="mt-3 flex flex-wrap gap-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 rounded-sm bg-slate-500" />
+                            <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.chart.invested")}</Text>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 rounded-sm bg-emerald-400" />
+                            <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.chart.gain")}</Text>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 rounded-sm bg-amber-400" />
+                            <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.interestPaid")}</Text>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 rounded-sm bg-emerald-500/40" />
+                            <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.finalValue")}</Text>
+                          </div>
+                          {result.inflationPct > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-3 h-3 rounded-sm bg-teal-600/40" />
+                              <Text className="text-tremor-content dark:text-slate-400 text-xs">{t("alloc.metrics.finalValueReal")}</Text>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </TabPanel>
                   </TabPanels>

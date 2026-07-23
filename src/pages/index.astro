@@ -16,6 +16,22 @@ const isFr = lang === 'fr';
 </div>
 
 <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+  <a href="/FFunds/retraite"
+     class="group block rounded-xl border border-slate-800 bg-slate-900/60 p-6
+            transition-all duration-200 hover:border-teal-500/30 hover:bg-slate-900">
+    <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-teal-500/10">
+      <svg class="h-5 w-5 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8zm6-3a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    </div>
+    <h3 class="text-sm font-semibold text-slate-100 group-hover:text-teal-400 transition-colors" data-i18n="home.card.retraite.title">{T["home.card.retraite.title"]}</h3>
+    <p class="mt-1.5 text-xs text-slate-500 leading-relaxed" data-i18n="home.card.retraite.desc">{T["home.card.retraite.desc"]}</p>
+    <span class="mt-4 inline-flex items-center gap-1 text-xs font-medium text-teal-400 opacity-0 group-hover:opacity-100 transition-opacity">
+      <span data-i18n="home.card.launch">{T["home.card.launch"]}</span>
+      <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+    </span>
+  </a>
+
   <a href="/FFunds/allocator"
      class="group block rounded-xl border border-slate-800 bg-slate-900/60 p-6
             transition-all duration-200 hover:border-emerald-500/30 hover:bg-slate-900">
@@ -46,23 +62,6 @@ const isFr = lang === 'fr';
     <p class="mt-1.5 text-xs text-slate-500 leading-relaxed" data-i18n="home.card.simulations.desc">{T["home.card.simulations.desc"]}</p>
     <span class="mt-4 inline-flex items-center gap-1 text-xs font-medium text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
       <span data-i18n="home.card.launch">{T["home.card.launch"]}</span>
-      <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-    </span>
-  </a>
-
-  <a href="/FFunds/knowledge"
-     class="group block rounded-xl border border-slate-800 bg-slate-900/60 p-6
-            transition-all duration-200 hover:border-amber-500/30 hover:bg-slate-900">
-    <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
-      <svg class="h-5 w-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-      </svg>
-    </div>
-    <h3 class="text-sm font-semibold text-slate-100 group-hover:text-amber-400 transition-colors" data-i18n="home.card.knowledge.title">{T["home.card.knowledge.title"]}</h3>
-    <p class="mt-1.5 text-xs text-slate-500 leading-relaxed" data-i18n="home.card.knowledge.desc">{T["home.card.knowledge.desc"]}</p>
-    <span class="mt-4 inline-flex items-center gap-1 text-xs font-medium text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity">
-      <span data-i18n="home.card.explore">{T["home.card.explore"]}</span>
       <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
     </span>
   </a>
@@ -130,6 +129,23 @@ const isFr = lang === 'fr';
       <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
     </span>
   </a>
+
+  <a href="/FFunds/knowledge"
+     class="group block rounded-xl border border-slate-800 bg-slate-900/60 p-6
+            transition-all duration-200 hover:border-amber-500/30 hover:bg-slate-900">
+    <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
+      <svg class="h-5 w-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+      </svg>
+    </div>
+    <h3 class="text-sm font-semibold text-slate-100 group-hover:text-amber-400 transition-colors" data-i18n="home.card.knowledge.title">{T["home.card.knowledge.title"]}</h3>
+    <p class="mt-1.5 text-xs text-slate-500 leading-relaxed" data-i18n="home.card.knowledge.desc">{T["home.card.knowledge.desc"]}</p>
+    <span class="mt-4 inline-flex items-center gap-1 text-xs font-medium text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity">
+      <span data-i18n="home.card.explore">{T["home.card.explore"]}</span>
+      <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+    </span>
+  </a>
 </div>
 
 <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -138,7 +154,7 @@ const isFr = lang === 'fr';
       <svg class="h-4 w-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
       <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500" data-i18n="home.stats.assets">{T["home.stats.assets"]}</p>
     </div>
-    <p class="mt-2 text-2xl font-semibold tabular-nums text-slate-100">24</p>
+    <p class="mt-2 text-2xl font-semibold tabular-nums text-slate-100">25</p>
     <p class="mt-0.5 text-xs text-slate-600" data-i18n="home.stats.assets.desc">{T["home.stats.assets.desc"]}</p>
   </div>
   <div class="rounded-xl border border-slate-800 bg-slate-900/40 p-4">

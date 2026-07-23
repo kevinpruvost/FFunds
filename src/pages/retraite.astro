@@ -1,0 +1,21 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { readLang } from '../i18n/astro-i18n';
+import { TRANSLATIONS } from '../i18n/translations';
+import RetraiteSimplifiee from '../components/RetraiteSimplifiee';
+
+const lang = readLang();
+const T = TRANSLATIONS[lang];
+---
+
+<BaseLayout title={T["ret.title"]} description={T["ret.subtitle"]}>
+
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-slate-50" data-i18n="ret.title">{T["ret.title"]}</h1>
+  <p class="mt-1 text-sm text-slate-400" data-i18n="ret.subtitle">{T["ret.subtitle"]}</p>
+  <p class="mt-2 text-xs text-slate-500" data-i18n="ret.hint">{T["ret.hint"]}</p>
+</div>
+
+<RetraiteSimplifiee client:load />
+
+</BaseLayout>

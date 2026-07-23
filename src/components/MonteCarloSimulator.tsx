@@ -101,14 +101,31 @@ interface SingleRunResult {
   marketMaxDrawdown: number;
 }
 
-type PresetKey = "custom" | "golden" | "golden-2x" | "sp500" | "world";
+export type PresetKey =
+  | "custom"
+  | "golden"
+  | "golden-2x"
+  | "golden-3x"
+  | "sp500"
+  | "world"
+  | "nasdaq-2x"
+  | "all-weather";
 
-const PRESETS: Record<PresetKey, { cagr: number; drawdown: number }> = {
+export const PRESETS: Record<PresetKey, { cagr: number; drawdown: number }> = {
   custom: { cagr: 7, drawdown: 30 },
   golden: { cagr: 8, drawdown: 29 },
   "golden-2x": { cagr: 11.5, drawdown: 40 },
+  // 3× Golden Ratio with 4% margin loan rate: 3 × 8% − 2 × 4% = 16% gross,
+  // trimmed for volatility drag ≈ 14%. Drawdown roughly tripled, capped ~60%.
+  "golden-3x": { cagr: 14, drawdown: 60 },
   sp500: { cagr: 10.76, drawdown: 63 },
   world: { cagr: 8.05, drawdown: 55 },
+  // 2× Nasdaq-100 via leveraged ETF (~0.5% internal financing). QQQ CAGR
+  // ~15%, 2× leveraged with volatility drag ≈ 22%. Drawdown near 80%.
+  "nasdaq-2x": { cagr: 22, drawdown: 80 },
+  // All-Weather (Ray Dalio): diversified across equities, long/short bonds,
+  // gold, commodities. Low volatility, ~7.5% CAGR, max drawdown ~25%.
+  "all-weather": { cagr: 7.5, drawdown: 25 },
 };
 
 const EPSILON = 1e-12;
@@ -425,7 +442,7 @@ function MonteCarloSimulatorInner(): JSX.Element {
   const [initial, setInitial] = useState(10000);
   const [monthly, setMonthly] = useState(300);
   const [cagr, setCagr] = useState(8);
-  const [inflation, setInflation] = useState(2);
+  const [inflation, setInflation] = useState(2.5);
   const [drawdown, setDrawdown] = useState(29);
   const [target, setTarget] = useState(0);
   const [paths, setPaths] = useState(1000);
@@ -597,17 +614,25 @@ function MonteCarloSimulatorInner(): JSX.Element {
   /* Chart data */
   const chartData = useMemo(() => {
     if (!simResult) return [];
-    return simResult.series.years.map((yr, i) => ({
-      year: yr,
-      p10: simResult.series.p10[i],
-      p50: simResult.series.p50[i],
-      p90: simResult.series.p90[i],
-      bandMin: simResult.series.p10[i],
-      bandMax: simResult.series.p90[i],
-      invested: simResult.invested[i] || 0,
-      target: target > 0 ? target : undefined,
-    }));
-  }, [simResult, target]);
+    const inflFrac = inflation / 100;
+    return simResult.series.years.map((yr, i) => {
+      const yearsFromNow = Math.max(0, yr - simResult.currentAge);
+      const realFactor = inflFrac > 0 ? 1 / Math.pow(1 + inflFrac, yearsFromNow) : 1;
+      return {
+        year: yr,
+        p10: simResult.series.p10[i],
+        p50: simResult.series.p50[i],
+        p90: simResult.series.p90[i],
+        p10r: simResult.series.p10[i] * realFactor,
+        p50r: simResult.series.p50[i] * realFactor,
+        p90r: simResult.series.p90[i] * realFactor,
+        bandMin: simResult.series.p10[i],
+        bandMax: simResult.series.p90[i],
+        invested: simResult.invested[i] || 0,
+        target: target > 0 ? target : undefined,
+      };
+    });
+  }, [simResult, target, inflation]);
 
   const singleChartData = useMemo(() => {
     if (!singleResult) return [];
@@ -641,6 +666,9 @@ function MonteCarloSimulatorInner(): JSX.Element {
             else if (key === "p90") { label2 = t("mc.tooltip.optimistic"); color = "#3b82f6"; val = fmtEUR(entry.value); }
             else if (key === "invested") { label2 = t("mc.tooltip.invested"); color = "#64748b"; val = fmtEUR(entry.value); }
             else if (key === "target") { label2 = t("mc.tooltip.target"); color = "#f59e0b"; val = fmtEUR(entry.value); }
+            else if (key === "p50r") { label2 = `${t("mc.tooltip.median")} (${t("mc.result.realSuffix")})`; color = "#10b981"; val = fmtEUR(entry.value); }
+            else if (key === "p10r") { label2 = `${t("mc.tooltip.pessimistic")} (${t("mc.result.realSuffix")})`; color = "#f43f5e"; val = fmtEUR(entry.value); }
+            else if (key === "p90r") { label2 = `${t("mc.tooltip.optimistic")} (${t("mc.result.realSuffix")})`; color = "#3b82f6"; val = fmtEUR(entry.value); }
             else if (key === "value") { label2 = t("mc.tooltip.value"); color = "#10b981"; val = fmtEUR(entry.value); }
             if (!label2) return null;
             return (
@@ -942,6 +970,37 @@ function MonteCarloSimulatorInner(): JSX.Element {
                     name={t("mc.legend.target")}
                   />
                 )}
+                {inflation > 0 && (
+                  <>
+                    <Line
+                      type="monotone"
+                      dataKey="p50r"
+                      stroke="#0d9488"
+                      strokeWidth={1.5}
+                      strokeDasharray="1 3"
+                      dot={false}
+                      name={`${t("mc.legend.median")} (${t("mc.result.realSuffix")})`}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="p10r"
+                      stroke="#9f1239"
+                      strokeWidth={1}
+                      strokeDasharray="1 3"
+                      dot={false}
+                      name={`${t("mc.tooltip.pessimistic")} (${t("mc.result.realSuffix")})`}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="p90r"
+                      stroke="#1e40af"
+                      strokeWidth={1}
+                      strokeDasharray="1 3"
+                      dot={false}
+                      name={`${t("mc.tooltip.optimistic")} (${t("mc.result.realSuffix")})`}
+                    />
+                  </>
+                )}
                 <Brush
                   dataKey="year"
                   height={30}
@@ -979,6 +1038,12 @@ function MonteCarloSimulatorInner(): JSX.Element {
             <i className="w-3.5 h-0.5 rounded-full" style={{ background: "#64748b" }}></i>
             {t("mc.legend.invested")}
           </span>
+          {inflation > 0 && (
+            <span className="inline-flex items-center gap-2">
+              <i className="w-3.5 h-0.5 rounded-full" style={{ background: "#0d9488", borderTop: "2px dashed #0d9488" }}></i>
+              {t("mc.legend.medianReal")}
+            </span>
+          )}
         </div>
       </Card>
 

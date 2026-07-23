@@ -17,7 +17,9 @@ const ROOT = join(__dirname, "..");
 const CONFIG_PATH = join(ROOT, "src", "data", "tickers.config.json");
 const OUTPUT_PATH = join(ROOT, "src", "data", "prices.json");
 
-const PERIOD1 = 946684800; // 2000-01-01 00:00:00 UTC
+// 1999-01-01 — covers QQQ inception (1999-03-10) and most other US ETFs.
+// Yahoo returns data from each ticker's actual listing date onward.
+const PERIOD1 = 915148800; // 1999-01-01 00:00:00 UTC
 const PERIOD2 = Math.floor(Date.now() / 1000);
 
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
