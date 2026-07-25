@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { calculateSuccession, type AllocationMode, type GrandchildrenTransfer, type OtherRelationship, type SpouseOption } from "../lib/succession";
 
 interface Props {
@@ -38,7 +38,41 @@ export default function SuccessionCalculator({ T, isFr }: Props) {
     avBefore70Total: numericValue(avBefore70Total), avAfter70Premiums: numericValue(avAfter70Premiums), avAfter70Gains: numericValue(avAfter70Gains),
   }) : null, [calculated, spouse, spouseOption, spouseAge, allocationMode, children, grandchildren, grandchildrenTransfer, grandchildrenDonationAmount, grandchildrenRepresented, otherCount, otherRelationship, outsideAssets, realEstate, debts, avBefore70Total, avAfter70Premiums, avAfter70Gains]);
 
-  const numeric = (setter: (value: NumericValue) => void, raw: string) => setter(raw === "" ? "" : Math.max(0, Number.isFinite(Number(raw)) ? Number(raw) : 0));
+  const InputField = (label: string, value: NumericValue, setter: (value: NumericValue) => void, step = 1000, currency = true) => {
+    const [local, setLocal] = useState<string>(value === "" ? "" : String(value));
+
+    // Sync local state when external value changes (e.g. cookie load, reset)
+    useEffect(() => {
+      setLocal(value === "" ? "" : String(value));
+    }, [value]);
+
+    const commit = () => {
+      if (local === "") { setter(""); return; }
+      const parsed = Number(local);
+      if (!Number.isFinite(parsed) || parsed < 0) { setLocal(value === "" ? "" : String(value)); return; }
+      setter(parsed);
+      setLocal(String(parsed));
+    };
+
+    return (
+      <label className="space-y-1.5">
+        <span className="block text-sm font-medium text-slate-300">{label}</span>
+        <div className="relative">
+          {currency && <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">€</span>}
+          <input
+            type="text"
+            inputMode={currency ? "decimal" : "numeric"}
+            value={local}
+            onChange={(event) => setLocal(event.target.value)}
+            onBlur={commit}
+            onKeyDown={(event) => { if (event.key === "Enter") { (event.target as HTMLInputElement).blur(); } }}
+            className={`w-full rounded-lg border border-slate-700 bg-slate-800 py-2 ${currency ? "pl-7" : "px-3"} pr-3 text-slate-100 focus:border-rose-500 focus:outline-none`}
+          />
+        </div>
+      </label>
+    );
+  };
+
   const calculate = () => {
     const values = [outsideAssets, realEstate, debts, avBefore70Total, avAfter70Premiums, avAfter70Gains, spouseAge, children, grandchildren, grandchildrenDonationAmount, otherCount].map(numericValue);
     if (values.some((value) => !Number.isFinite(value) || value < 0)) {
@@ -49,15 +83,7 @@ export default function SuccessionCalculator({ T, isFr }: Props) {
     setCalculated(true);
   };
 
-  const input = (label: string, value: NumericValue, setter: (value: NumericValue) => void, step = 1000, currency = true) => (
-    <label className="space-y-1.5">
-      <span className="block text-sm font-medium text-slate-300">{label}</span>
-      <div className="relative">
-        {currency && <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">€</span>}
-        <input type="text" inputMode={currency ? "decimal" : "numeric"} min={0} step={step} value={value} onChange={(event) => numeric(setter, event.target.value)} className={`w-full rounded-lg border border-slate-700 bg-slate-800 py-2 ${currency ? "pl-7" : "px-3"} pr-3 text-slate-100 focus:border-rose-500 focus:outline-none`} />
-      </div>
-    </label>
-  );
+  const input = InputField;
 
   return (
     <section>
@@ -100,9 +126,9 @@ export default function SuccessionCalculator({ T, isFr }: Props) {
           {input(tx("Dettes à déduire", "Debts to deduct"), debts, setDebts)}
 
           <div className="col-span-full border-t border-slate-700/60 pt-4"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Assurance-vie</p><p className="mt-1 text-xs text-slate-500">{tx("Séparez les versements selon l'âge au moment du versement.", "Separate premiums by the age when they were paid.")}</p></div>
-          {input(tx("Capital décès lié aux versements avant 70 ans", "Death benefit from premiums paid before age 70"), avBefore70Total)}
-          {input(tx("Primes versées après 70 ans", "Premiums paid after age 70"), avAfter70Premiums)}
-          {input(tx("Gains liés aux primes après 70 ans", "Gains on premiums paid after age 70"), avAfter70Gains)}
+          {input(tx("Capital décès lié aux versements avant 70 ans", "Death benefit from premiums paid before age 70"), avBefore70Total, setAvBefore70Total)}
+          {input(tx("Primes versées après 70 ans", "Premiums paid after age 70"), avAfter70Premiums, setAvAfter70Premiums)}
+          {input(tx("Gains liés aux primes après 70 ans", "Gains on premiums paid after age 70"), avAfter70Gains, setAvAfter70Gains)}
 
           <div className="col-span-full border-t border-slate-700/60 pt-4"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{tx("Bénéficiaires hors descendants", "Non-descendant beneficiaries")}</p></div>
           {input(tx("Nombre de bénéficiaires", "Number of beneficiaries"), otherCount, setOtherCount, 1, false)}
