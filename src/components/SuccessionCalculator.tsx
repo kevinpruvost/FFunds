@@ -10,6 +10,48 @@ const money = (value: number, isFr: boolean) => new Intl.NumberFormat(isFr ? "fr
 type NumericValue = number | "";
 const numericValue = (value: NumericValue) => value === "" ? 0 : value;
 
+interface InputFieldProps {
+  label: string;
+  value: NumericValue;
+  setter: (value: NumericValue) => void;
+  currency?: boolean;
+}
+
+function InputField({ label, value, setter, currency = true }: InputFieldProps) {
+  const [local, setLocal] = useState<string>(value === "" ? "" : String(value));
+
+  // Sync local state when external value changes (e.g. reset)
+  useEffect(() => {
+    setLocal(value === "" ? "" : String(value));
+  }, [value]);
+
+  const commit = () => {
+    if (local === "") { setter(""); return; }
+    const parsed = Number(local);
+    if (!Number.isFinite(parsed) || parsed < 0) { setLocal(value === "" ? "" : String(value)); return; }
+    setter(parsed);
+    setLocal(String(parsed));
+  };
+
+  return (
+    <label className="space-y-1.5">
+      <span className="block text-sm font-medium text-slate-300">{label}</span>
+      <div className="relative">
+        {currency && <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">€</span>}
+        <input
+          type="text"
+          inputMode={currency ? "decimal" : "numeric"}
+          value={local}
+          onChange={(event) => setLocal(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => { if (event.key === "Enter") { (event.target as HTMLInputElement).blur(); } }}
+          className={`w-full rounded-lg border border-slate-700 bg-slate-800 py-2 ${currency ? "pl-7" : "px-3"} pr-3 text-slate-100 focus:border-rose-500 focus:outline-none`}
+        />
+      </div>
+    </label>
+  );
+}
+
 export default function SuccessionCalculator({ T, isFr }: Props) {
   const tx = (fr: string, en: string) => isFr ? fr : en;
   const [spouse, setSpouse] = useState(false);
@@ -38,41 +80,6 @@ export default function SuccessionCalculator({ T, isFr }: Props) {
     avBefore70Total: numericValue(avBefore70Total), avAfter70Premiums: numericValue(avAfter70Premiums), avAfter70Gains: numericValue(avAfter70Gains),
   }) : null, [calculated, spouse, spouseOption, spouseAge, allocationMode, children, grandchildren, grandchildrenTransfer, grandchildrenDonationAmount, grandchildrenRepresented, otherCount, otherRelationship, outsideAssets, realEstate, debts, avBefore70Total, avAfter70Premiums, avAfter70Gains]);
 
-  const InputField = (label: string, value: NumericValue, setter: (value: NumericValue) => void, step = 1000, currency = true) => {
-    const [local, setLocal] = useState<string>(value === "" ? "" : String(value));
-
-    // Sync local state when external value changes (e.g. cookie load, reset)
-    useEffect(() => {
-      setLocal(value === "" ? "" : String(value));
-    }, [value]);
-
-    const commit = () => {
-      if (local === "") { setter(""); return; }
-      const parsed = Number(local);
-      if (!Number.isFinite(parsed) || parsed < 0) { setLocal(value === "" ? "" : String(value)); return; }
-      setter(parsed);
-      setLocal(String(parsed));
-    };
-
-    return (
-      <label className="space-y-1.5">
-        <span className="block text-sm font-medium text-slate-300">{label}</span>
-        <div className="relative">
-          {currency && <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">€</span>}
-          <input
-            type="text"
-            inputMode={currency ? "decimal" : "numeric"}
-            value={local}
-            onChange={(event) => setLocal(event.target.value)}
-            onBlur={commit}
-            onKeyDown={(event) => { if (event.key === "Enter") { (event.target as HTMLInputElement).blur(); } }}
-            className={`w-full rounded-lg border border-slate-700 bg-slate-800 py-2 ${currency ? "pl-7" : "px-3"} pr-3 text-slate-100 focus:border-rose-500 focus:outline-none`}
-          />
-        </div>
-      </label>
-    );
-  };
-
   const calculate = () => {
     const values = [outsideAssets, realEstate, debts, avBefore70Total, avAfter70Premiums, avAfter70Gains, spouseAge, children, grandchildren, grandchildrenDonationAmount, otherCount].map(numericValue);
     if (values.some((value) => !Number.isFinite(value) || value < 0)) {
@@ -82,8 +89,6 @@ export default function SuccessionCalculator({ T, isFr }: Props) {
     setError("");
     setCalculated(true);
   };
-
-  const input = InputField;
 
   return (
     <section>
@@ -112,26 +117,26 @@ export default function SuccessionCalculator({ T, isFr }: Props) {
               <option value="usufruit">{tx("Usufruit de la totalité", "Usufruct of the whole estate")}</option>
             </select>
           </div>}
-          {spouse && spouseOption === "usufruit" && input(tx("Âge du conjoint usufruitier", "Spouse usufructuary age"), spouseAge, setSpouseAge, 1, false)}
+          {spouse && spouseOption === "usufruit" && <InputField label={tx("Âge du conjoint usufruitier", "Spouse usufructuary age")} value={spouseAge} setter={setSpouseAge} currency={false} />}
           <label className="space-y-1.5"><span className="block text-sm font-medium text-slate-300">{tx("Mode de répartition", "Allocation mode")}</span><select value={allocationMode} onChange={(event) => setAllocationMode(event.target.value as AllocationMode)} className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"><option value="equal">{tx("Répartition égale", "Equal allocation")}</option><option value="tax">{tx("Optimisation fiscale — équitable", "Tax optimization — fair")}</option></select>{allocationMode === "tax" && <span className="block text-xs text-slate-500">{tx("À impôt minimal égal, les montants sont nivelés entre les bénéficiaires.", "When the minimum tax is the same, amounts are leveled across beneficiaries.")}</span>}</label>
-          {input(tx("Enfants vivants", "Living children"), children, setChildren, 1, false)}
-          {input(tx(grandchildrenTransfer === "donation" ? "Petits-enfants bénéficiaires" : "Petits-enfants héritiers", grandchildrenTransfer === "donation" ? "Grandchildren receiving a gift" : "Grandchildren inheriting"), grandchildren, setGrandchildren, 1, false)}
+          <InputField label={tx("Enfants vivants", "Living children")} value={children} setter={setChildren} currency={false} />
+          <InputField label={tx(grandchildrenTransfer === "donation" ? "Petits-enfants bénéficiaires" : "Petits-enfants héritiers", grandchildrenTransfer === "donation" ? "Grandchildren receiving a gift" : "Grandchildren inheriting")} value={grandchildren} setter={setGrandchildren} currency={false} />
           {grandchildren > 0 && <label className="space-y-1.5"><span className="block text-sm font-medium text-slate-300">{tx("Mode de transmission des petits-enfants", "Grandchildren transfer mode")}</span><select value={grandchildrenTransfer} onChange={(event) => setGrandchildrenTransfer(event.target.value as GrandchildrenTransfer)} className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"><option value="testament">{tx("Testament (abattement succession)", "Will (inheritance allowance)")}</option><option value="donation">{tx("Donation (abattement donation)", "Gift (donation allowance)")}</option></select></label>}
-          {grandchildren > 0 && grandchildrenTransfer === "donation" && <div className="space-y-1.5"><div>{input(tx("Montant total donné aux petits-enfants", "Total amount gifted to grandchildren"), grandchildrenDonationAmount, setGrandchildrenDonationAmount)}</div><p className="text-xs text-slate-500">{tx("Le simulateur retire d'abord ce montant de l'AV, calcule la fiscalité des gains retirés, puis répartit le don à parts égales.", "The simulator first withdraws this amount from life insurance, taxes the withdrawn gains, then splits the gift equally.")}</p></div>}
+          {grandchildren > 0 && grandchildrenTransfer === "donation" && <div className="space-y-1.5"><div><InputField label={tx("Montant total donné aux petits-enfants", "Total amount gifted to grandchildren")} value={grandchildrenDonationAmount} setter={setGrandchildrenDonationAmount} /></div><p className="text-xs text-slate-500">{tx("Le simulateur retire d'abord ce montant de l'AV, calcule la fiscalité des gains retirés, puis répartit le don à parts égales.", "The simulator first withdraws this amount from life insurance, taxes the withdrawn gains, then splits the gift equally.")}</p></div>}
           {grandchildren > 0 && grandchildrenTransfer === "testament" && <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={grandchildrenRepresented} onChange={(event) => setGrandchildrenRepresented(event.target.checked)} className="accent-rose-600" />{tx("Ils représentent un enfant prédécédé/renonçant", "They represent a predeceased/renouncing child")}</label>}
 
           <div className="col-span-full border-t border-slate-700/60 pt-4"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{tx("Actif net", "Net estate")}</p></div>
-          {input(tx("Actifs financiers et liquidités", "Financial assets and cash"), outsideAssets, setOutsideAssets)}
-          {input(tx("Immobilier", "Real estate"), realEstate, setRealEstate, 10000)}
-          {input(tx("Dettes à déduire", "Debts to deduct"), debts, setDebts)}
+          <InputField label={tx("Actifs financiers et liquidités", "Financial assets and cash")} value={outsideAssets} setter={setOutsideAssets} />
+          <InputField label={tx("Immobilier", "Real estate")} value={realEstate} setter={setRealEstate} />
+          <InputField label={tx("Dettes à déduire", "Debts to deduct")} value={debts} setter={setDebts} />
 
           <div className="col-span-full border-t border-slate-700/60 pt-4"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Assurance-vie</p><p className="mt-1 text-xs text-slate-500">{tx("Séparez les versements selon l'âge au moment du versement.", "Separate premiums by the age when they were paid.")}</p></div>
-          {input(tx("Capital décès lié aux versements avant 70 ans", "Death benefit from premiums paid before age 70"), avBefore70Total, setAvBefore70Total)}
-          {input(tx("Primes versées après 70 ans", "Premiums paid after age 70"), avAfter70Premiums, setAvAfter70Premiums)}
-          {input(tx("Gains liés aux primes après 70 ans", "Gains on premiums paid after age 70"), avAfter70Gains, setAvAfter70Gains)}
+          <InputField label={tx("Capital décès lié aux versements avant 70 ans", "Death benefit from premiums paid before age 70")} value={avBefore70Total} setter={setAvBefore70Total} />
+          <InputField label={tx("Primes versées après 70 ans", "Premiums paid after age 70")} value={avAfter70Premiums} setter={setAvAfter70Premiums} />
+          <InputField label={tx("Gains liés aux primes après 70 ans", "Gains on premiums paid after age 70")} value={avAfter70Gains} setter={setAvAfter70Gains} />
 
           <div className="col-span-full border-t border-slate-700/60 pt-4"><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{tx("Bénéficiaires hors descendants", "Non-descendant beneficiaries")}</p></div>
-          {input(tx("Nombre de bénéficiaires", "Number of beneficiaries"), otherCount, setOtherCount, 1, false)}
+          <InputField label={tx("Nombre de bénéficiaires", "Number of beneficiaries")} value={otherCount} setter={setOtherCount} currency={false} />
           <label className="space-y-1.5"><span className="block text-sm font-medium text-slate-300">{tx("Lien de parenté", "Relationship")}</span><select value={otherRelationship} onChange={(event) => setOtherRelationship(event.target.value as OtherRelationship)} className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"><option value="sibling">{tx("Frère / sœur", "Sibling")}</option><option value="nephew">{tx("Neveu / nièce", "Nephew / niece")}</option><option value="other">{tx("Autre / non-parent", "Other / unrelated")}</option></select></label>
         </div>
 

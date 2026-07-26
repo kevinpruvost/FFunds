@@ -1,0 +1,20 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { readLang } from '../i18n/astro-i18n';
+import { TRANSLATIONS } from '../i18n/translations';
+import ComptesBanques from '../components/ComptesBanques';
+
+const lang = readLang();
+const T = TRANSLATIONS[lang];
+---
+
+<BaseLayout title={T["cb.banques.title"]} description={T["cb.banques.subtitle"]}>
+
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-slate-50" data-i18n="cb.banques.title">{T["cb.banques.title"]}</h1>
+  <p class="mt-1 text-sm text-slate-400" data-i18n="cb.banques.subtitle">{T["cb.banques.subtitle"]}</p>
+</div>
+
+<ComptesBanques client:load mode="banques" />
+
+</BaseLayout>
