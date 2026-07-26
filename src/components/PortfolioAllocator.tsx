@@ -94,6 +94,8 @@ interface SimulationInput {
   yearsBack: number;
   customStart: string; // "" = no lower bound
   customEnd: string;   // "" = no upper bound
+  // Stop monthly contributions after this many years (0 = never stop).
+  contribStopYears: number;
 }
 
 interface BacktestResult {
@@ -358,6 +360,7 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
     yearsBack,
     customStart,
     customEnd,
+    contribStopYears,
   } = input;
   if (tickers.length === 0) return null;
 
@@ -471,7 +474,7 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
       break;
     }
 
-    const contribution = monthlyContribution;
+    const contribution = contribStopYears > 0 && m > contribStopYears * 12 ? 0 : monthlyContribution;
     for (let i = 0; i < n; i++) {
       assetValues[i] += contribution * wFrac[i];
     }
@@ -619,6 +622,50 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
 
 /* ─────────────────────────── Component ─────────────────────────── */
 
+// Module-scope helpers (defined OUTSIDE PortfolioAllocatorInner so React doesn't
+// remount the subtree on each state change — causes NumberInput defocus bug).
+const LabelWithHelp = ({ labelKey, helpKey, children }: { labelKey: string; helpKey: string; children?: React.ReactNode }) => {
+  const { t } = useI18n();
+  return (
+    <div className="group relative inline-block w-full">
+      <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1 cursor-help">{t(labelKey)}</Text>
+      {children}
+      <div className="pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-64 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
+        {t(helpKey)}
+      </div>
+    </div>
+  );
+};
+
+const MetricCard = ({
+  labelKey,
+  helpKey,
+  children,
+  cardClass = "",
+  metricClass = "",
+}: {
+  labelKey: string;
+  helpKey: string;
+  children: React.ReactNode;
+  cardClass?: string;
+  metricClass?: string;
+}) => {
+  const { t } = useI18n();
+  return (
+    <Col>
+      <div className="group relative">
+        <Card className={`bg-slate-800/50 border-slate-700/50 p-3 cursor-help ${cardClass}`}>
+          <Text className="text-tremor-content dark:text-slate-400 text-xs">{t(labelKey)}</Text>
+          <Metric className={`text-lg ${metricClass}`}>{children}</Metric>
+        </Card>
+        <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-64 -translate-x-1/2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
+          {t(helpKey)}
+        </div>
+      </div>
+    </Col>
+  );
+};
+
 function PortfolioAllocatorInner(): JSX.Element {
   const { lang, t } = useI18n();
   const [selectedTickers, setSelectedTickers] = useState<string[]>(["SPY", "SHY"]);
@@ -643,6 +690,7 @@ function PortfolioAllocatorInner(): JSX.Element {
   const [yearsBack, setYearsBack] = useState<number>(10);
   const [customStart, setCustomStart] = useState<string>("");
   const [customEnd, setCustomEnd] = useState<string>("");
+  const [contribStopYears, setContribStopYears] = useState<number>(0);
 
   // Custom tickers state
   const [customTickers, setCustomTickers] = useState<Record<string, CustomTicker>>({});
@@ -695,6 +743,7 @@ function PortfolioAllocatorInner(): JSX.Element {
         yearsBack: number;
         customStart: string;
         customEnd: string;
+        contribStopYears: number;
       }>;
       if (Array.isArray(data.selectedTickers) && data.selectedTickers.length > 0) {
         setSelectedTickers(data.selectedTickers);
@@ -716,6 +765,7 @@ function PortfolioAllocatorInner(): JSX.Element {
       if (typeof data.yearsBack === "number") setYearsBack(data.yearsBack);
       if (typeof data.customStart === "string") setCustomStart(data.customStart);
       if (typeof data.customEnd === "string") setCustomEnd(data.customEnd);
+      if (typeof data.contribStopYears === "number") setContribStopYears(data.contribStopYears);
     } catch {
       // ignore corrupt cookie
     }
@@ -740,6 +790,7 @@ function PortfolioAllocatorInner(): JSX.Element {
       yearsBack,
       customStart,
       customEnd,
+      contribStopYears,
     };
     const value = encodeURIComponent(JSON.stringify(data));
     document.cookie = `${PA_COOKIE_NAME}=${value}; max-age=${PA_COOKIE_MAX_AGE}; path=/; SameSite=Lax`;
@@ -760,6 +811,7 @@ function PortfolioAllocatorInner(): JSX.Element {
     yearsBack,
     customStart,
     customEnd,
+    contribStopYears,
   ]);
 
   // Build merged prices map (static + custom)
@@ -809,8 +861,9 @@ function PortfolioAllocatorInner(): JSX.Element {
       yearsBack,
       customStart,
       customEnd,
+      contribStopYears,
     }),
-    [selectedTickers, weightArray, initialInvestment, monthlyContribution, rebalance, marginEnabled, marginLeverage, marginLoanRatePct, marginInterestFreq, marginRebalance, marginRebalanceMode, inflationPct, windowMode, yearsBack, customStart, customEnd]
+    [selectedTickers, weightArray, initialInvestment, monthlyContribution, rebalance, marginEnabled, marginLeverage, marginLoanRatePct, marginInterestFreq, marginRebalance, marginRebalanceMode, inflationPct, windowMode, yearsBack, customStart, customEnd, contribStopYears]
   );
 
   const deferredInput = useDeferredValue(simulationInput);
@@ -1146,6 +1199,26 @@ function PortfolioAllocatorInner(): JSX.Element {
     return years;
   }, [result]);
 
+  // ── Contribution impact per year ──
+  // investedYear: total contributions that year. share = investedYear / equityEnd,
+  // i.e. what % of the year-end portfolio value came from that year's contributions.
+  const contributionImpactData = useMemo(() => {
+    if (!result) return [];
+    const buckets: Record<string, { year: string; investedYear: number; equityEnd: number }> = {};
+    for (let i = 0; i < result.months.length; i++) {
+      const y = result.months[i].slice(0, 4);
+      if (!buckets[y]) {
+        buckets[y] = { year: y, investedYear: 0, equityEnd: result.equityValue[i] };
+      }
+      const b = buckets[y];
+      b.equityEnd = result.equityValue[i];
+      if (i > 0) {
+        b.investedYear += result.invested[i] - result.invested[i - 1];
+      }
+    }
+    return Object.values(buckets).sort((a, b) => a.year.localeCompare(b.year));
+  }, [result]);
+
   // Group tickers by class for the picker
   const groupedTickers = useMemo(() => {
     const groups: Record<string, TickerMeta[]> = {};
@@ -1205,42 +1278,6 @@ function PortfolioAllocatorInner(): JSX.Element {
       </div>
     );
   };
-
-  const LabelWithHelp = ({ labelKey, helpKey, children }: { labelKey: string; helpKey: string; children?: React.ReactNode }) => (
-    <div className="group relative inline-block w-full">
-      <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1 cursor-help">{t(labelKey)}</Text>
-      {children}
-      <div className="pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-64 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
-        {t(helpKey)}
-      </div>
-    </div>
-  );
-
-  const MetricCard = ({
-    labelKey,
-    helpKey,
-    children,
-    cardClass = "",
-    metricClass = "",
-  }: {
-    labelKey: string;
-    helpKey: string;
-    children: React.ReactNode;
-    cardClass?: string;
-    metricClass?: string;
-  }) => (
-    <Col>
-      <div className="group relative">
-        <Card className={`bg-slate-800/50 border-slate-700/50 p-3 cursor-help ${cardClass}`}>
-          <Text className="text-tremor-content dark:text-slate-400 text-xs">{t(labelKey)}</Text>
-          <Metric className={`text-lg ${metricClass}`}>{children}</Metric>
-        </Card>
-        <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-64 -translate-x-1/2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
-          {t(helpKey)}
-        </div>
-      </div>
-    </Col>
-  );
 
   return (
     <div className="dark space-y-6">
@@ -1642,6 +1679,17 @@ function PortfolioAllocatorInner(): JSX.Element {
                   step={50}
                   className="bg-slate-900 border-slate-800 text-slate-200"
                 />
+              </Col>
+              <Col>
+                <LabelWithHelp labelKey="alloc.col.config.contribStop" helpKey="alloc.col.config.contribStop.help">
+                  <NumberInput
+                    value={contribStopYears}
+                    onValueChange={(v) => setContribStopYears(Math.max(0, Math.round(v ?? 0)))}
+                    min={0}
+                    step={1}
+                    className="bg-slate-900 border-slate-800 text-slate-200"
+                  />
+                </LabelWithHelp>
               </Col>
               <Col>
                 <LabelWithHelp labelKey="alloc.col.config.rebalance" helpKey="alloc.col.config.rebalance.help">
@@ -2186,6 +2234,37 @@ function PortfolioAllocatorInner(): JSX.Element {
                     </TabPanel>
                   </TabPanels>
                 </TabGroup>
+
+                {/* Contribution impact per year */}
+                {result && monthlyContribution > 0 && contributionImpactData.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="mb-1 text-sm font-semibold text-slate-200">{t("alloc.contrib.title")}</h3>
+                    <p className="mb-3 text-xs text-slate-500">{t("alloc.contrib.desc")}</p>
+                    <div className="overflow-x-auto rounded-xl border border-slate-800">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-700 bg-slate-900/60">
+                            <th className="px-3 py-2 font-semibold text-slate-300">{t("alloc.contrib.col.year")}</th>
+                            <th className="px-3 py-2 font-semibold text-slate-300 text-right">{t("alloc.contrib.col.invested")}</th>
+                            <th className="px-3 py-2 font-semibold text-slate-300 text-right">{t("alloc.contrib.col.contribShare")}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {contributionImpactData.map((row) => {
+                            const share = row.equityEnd > 0 ? (row.investedYear / row.equityEnd) * 100 : 0;
+                            return (
+                              <tr key={row.year} className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
+                                <td className="px-3 py-2 font-medium text-slate-100">{row.year}</td>
+                                <td className="px-3 py-2 text-slate-400 tabular-nums text-right">{formatEUR(row.investedYear, lang)}</td>
+                                <td className="px-3 py-2 text-emerald-400 tabular-nums text-right">{share.toFixed(1)} %</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </Card>
