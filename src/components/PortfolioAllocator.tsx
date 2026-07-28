@@ -86,6 +86,7 @@ interface SimulationInput {
   // marginRebalanceMode.
   marginRebalance: boolean;
   marginRebalanceMode: "gains-only" | "bidirectional";
+  marginMaintenancePct: number;
   inflationPct: number;
   // Time window filter. "all" = full available data (default, no limit),
   // "lastN" = keep only the last N years of the available period,
@@ -355,6 +356,7 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
     marginInterestFreq,
     marginRebalance,
     marginRebalanceMode,
+    marginMaintenancePct,
     inflationPct,
     windowMode,
     yearsBack,
@@ -458,9 +460,12 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
     const marketReturn = equityPrev > 0 ? (equityAfter - equityPrev) / equityPrev : 0;
     monthlyReturns.push(marketReturn);
 
-    // Liquidation: equity wiped out. Broker sells everything, equity is 0
-    // for the rest of the run.
-    if (marginEnabled && equityAfter <= 0 && liquidationMonth === null) {
+    // Margin call / liquidation: equity falls below maintenance margin.
+    // Broker sells everything, equity is 0 for the rest of the run.
+    // Maintenance threshold: maintenancePct of total asset value. If equity < threshold,
+    // liquidation triggers.
+    const maintThreshold = marginEnabled ? marginMaintenancePct / 100 * valueAfterMarket : 0;
+    if (marginEnabled && equityAfter <= maintThreshold && liquidationMonth === null) {
       liquidationMonth = monthLabel;
       loanAmount = 0;
       for (let k = m; k < months.length; k++) {
@@ -622,13 +627,140 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
 
 /* ─────────────────────────── Component ─────────────────────────── */
 
+type OptimizeGoal = "cagr" | "sharpe" | "minVol";
+
+// Sample a random weight vector of length n that sums to 1 using Dirichlet-like
+// perturbation around a center. `concentration` controls how spread the samples are:
+// low = close to center, high = more uniform.
+function sampleDirichlet(n: number, center: number[], concentration: number): number[] {
+  const alpha = center.map((c) => Math.max(0.01, c * concentration));
+  const samples = alpha.map((a) => {
+    // Gamma sample via Marsaglia-Tsang
+    if (a < 1) {
+      // Boost for shape < 1
+      const u = Math.random();
+      const e = Math.random();
+      return Math.pow(u, 1 / a) * (-Math.log(e));
+    }
+    const d = a - 1 / 3;
+    const c = 1 / Math.sqrt(9 * d);
+    let x: number, v: number;
+    for (;;) {
+      let z: number;
+      do {
+        const r1 = Math.random();
+        const r2 = Math.random();
+        z = Math.sqrt(-2 * Math.log(r1)) * Math.cos(2 * Math.PI * r2);
+      } while (z <= -c);
+      v = 1 + c * z;
+      x = d * v * v * v;
+      const r3 = Math.random();
+      const u2 = 0.5 * r3 * r3;
+      if (u2 < 1 - 0.0331 * z * z * z * z || Math.log(u2) < 0.5 * z * z + d * (1 - v + Math.log(v))) {
+        break;
+      }
+    }
+    return x;
+  });
+  const sum = samples.reduce((s, v) => s + v, 0);
+  return samples.map((v) => v / sum);
+}
+
+// Optimizer: searches weight+leverage space to maximize (or minimize) a metric.
+// Uses random sampling + coordinate refinement. Returns best weights and leverage.
+function optimizePortfolio(
+  base: SimulationInput,
+  allPrices: PricesMap,
+  goal: OptimizeGoal,
+  onProgress?: (p: number) => void
+): { weights: number[]; marginEnabled: boolean; marginLeverage: number } | null {
+  const n = base.tickers.length;
+  if (n === 0) return null;
+  const leverageOptions = [1, 1.5, 2, 2.5, 3];
+  const evalCandidate = (
+    w: number[],
+    leverage: number
+  ): { metric: number; valid: boolean } => {
+    const input: SimulationInput = {
+      ...base,
+      weights: w,
+      marginEnabled: leverage > 1,
+      marginLeverage: leverage,
+      marginLoanRate: base.marginLoanRate,
+      marginRebalance: leverage > 1 ? base.marginRebalance : false,
+      marginRebalanceMode: base.marginRebalanceMode,
+      marginMaintenancePct: base.marginMaintenancePct,
+    };
+    const res = runBacktest(input, allPrices);
+    if (!res || res.liquidationMonth || res.cagr <= -0.99) return { metric: -Infinity, valid: false };
+    let metric: number;
+    switch (goal) {
+      case "cagr":
+        metric = res.cagr;
+        break;
+      case "sharpe":
+        metric = res.sharpe;
+        break;
+      case "minVol":
+        metric = -res.volatility; // minimize = maximize negative
+        break;
+    }
+    return { metric, valid: true };
+  };
+
+  // Phase 1: random search around current weights
+  const center = base.weights.length === n ? base.weights.map((w) => w / 100) : Array(n).fill(1 / n);
+  const N_RANDOM = 60;
+  let bestMetric = -Infinity;
+  let bestW = center.slice();
+  let bestLev = 1;
+  for (let i = 0; i < N_RANDOM; i++) {
+    for (const lev of leverageOptions) {
+      const conc = 5 + i * 0.3;
+      const w = sampleDirichlet(n, center, conc);
+      const { metric, valid } = evalCandidate(w, lev);
+      if (valid && metric > bestMetric) {
+        bestMetric = metric;
+        bestW = w.slice();
+        bestLev = lev;
+      }
+    }
+    if (onProgress && i % 10 === 0) onProgress(i / N_RANDOM * 0.5);
+  }
+
+  // Phase 2: coordinate refinement on the best candidate
+  for (let round = 0; round < 3; round++) {
+    for (const lev of leverageOptions) {
+      for (let i = 0; i < n; i++) {
+        for (let delta of [0.05, -0.05, 0.1, -0.1, 0.15, -0.15]) {
+          const w = bestW.slice();
+          w[i] = Math.max(0, w[i] + delta);
+          const sum = w.reduce((s, v) => s + v, 0);
+          if (sum <= 0) continue;
+          for (let k = 0; k < n; k++) w[k] /= sum;
+          const { metric, valid } = evalCandidate(w, lev);
+          if (valid && metric > bestMetric) {
+            bestMetric = metric;
+            bestW = w.slice();
+            bestLev = lev;
+          }
+        }
+      }
+    }
+    if (onProgress) onProgress(0.5 + (round + 1) / 3 * 0.5);
+  }
+  if (onProgress) onProgress(1);
+
+  return { weights: bestW.map((v) => Math.round(v * 10000) / 100), marginEnabled: bestLev > 1, marginLeverage: bestLev };
+}
+
 // Module-scope helpers (defined OUTSIDE PortfolioAllocatorInner so React doesn't
 // remount the subtree on each state change — causes NumberInput defocus bug).
 const LabelWithHelp = ({ labelKey, helpKey, children }: { labelKey: string; helpKey: string; children?: React.ReactNode }) => {
   const { t } = useI18n();
   return (
     <div className="group relative inline-block w-full">
-      <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1 cursor-help">{t(labelKey)}</Text>
+      <Text className="text-tremor-content dark:text-slate-400 text-xs mb-1 cursor-help min-h-[1.25rem] leading-tight whitespace-nowrap truncate">{t(labelKey)}</Text>
       {children}
       <div className="pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-64 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
         {t(helpKey)}
@@ -683,6 +815,7 @@ function PortfolioAllocatorInner(): JSX.Element {
   const [marginInterestFreq, setMarginInterestFreq] = useState<SimulationInput["marginInterestFreq"]>("monthly");
   const [marginRebalance, setMarginRebalance] = useState<boolean>(true);
   const [marginRebalanceMode, setMarginRebalanceMode] = useState<SimulationInput["marginRebalanceMode"]>("gains-only");
+  const [marginMaintenancePct, setMarginMaintenancePct] = useState<number>(25);
 
   const [inflationPct, setInflationPct] = useState<number>(2.5);
 
@@ -691,6 +824,9 @@ function PortfolioAllocatorInner(): JSX.Element {
   const [customStart, setCustomStart] = useState<string>("");
   const [customEnd, setCustomEnd] = useState<string>("");
   const [contribStopYears, setContribStopYears] = useState<number>(0);
+
+  const [optimizing, setOptimizing] = useState<OptimizeGoal | null>(null);
+  const [optProgress, setOptProgress] = useState<number>(0);
 
   // Custom tickers state
   const [customTickers, setCustomTickers] = useState<Record<string, CustomTicker>>({});
@@ -738,6 +874,7 @@ function PortfolioAllocatorInner(): JSX.Element {
         marginInterestFreq: SimulationInput["marginInterestFreq"];
         marginRebalance: boolean;
         marginRebalanceMode: SimulationInput["marginRebalanceMode"];
+        marginMaintenancePct: number;
         inflationPct: number;
         windowMode: SimulationInput["windowMode"];
         yearsBack: number;
@@ -760,6 +897,7 @@ function PortfolioAllocatorInner(): JSX.Element {
       if (data.marginInterestFreq) setMarginInterestFreq(data.marginInterestFreq);
       if (typeof data.marginRebalance === "boolean") setMarginRebalance(data.marginRebalance);
       if (data.marginRebalanceMode) setMarginRebalanceMode(data.marginRebalanceMode);
+      if (typeof data.marginMaintenancePct === "number") setMarginMaintenancePct(data.marginMaintenancePct);
       if (typeof data.inflationPct === "number") setInflationPct(data.inflationPct);
       if (data.windowMode === "all" || data.windowMode === "lastN" || data.windowMode === "custom") setWindowMode(data.windowMode);
       if (typeof data.yearsBack === "number") setYearsBack(data.yearsBack);
@@ -785,6 +923,7 @@ function PortfolioAllocatorInner(): JSX.Element {
       marginInterestFreq,
       marginRebalance,
       marginRebalanceMode,
+      marginMaintenancePct,
       inflationPct,
       windowMode,
       yearsBack,
@@ -856,6 +995,7 @@ function PortfolioAllocatorInner(): JSX.Element {
       marginInterestFreq,
       marginRebalance,
       marginRebalanceMode,
+      marginMaintenancePct,
       inflationPct,
       windowMode,
       yearsBack,
@@ -863,7 +1003,10 @@ function PortfolioAllocatorInner(): JSX.Element {
       customEnd,
       contribStopYears,
     }),
-    [selectedTickers, weightArray, initialInvestment, monthlyContribution, rebalance, marginEnabled, marginLeverage, marginLoanRatePct, marginInterestFreq, marginRebalance, marginRebalanceMode, inflationPct, windowMode, yearsBack, customStart, customEnd, contribStopYears]
+    [selectedTickers, weightArray, initialInvestment, monthlyContribution, rebalance, marginEnabled, marginLeverage, marginLoanRatePct, marginInterestFreq, marginRebalance,     marginRebalanceMode,
+    marginMaintenancePct,
+    inflationPct,
+    windowMode, yearsBack, customStart, customEnd, contribStopYears]
   );
 
   const deferredInput = useDeferredValue(simulationInput);
@@ -975,6 +1118,35 @@ function PortfolioAllocatorInner(): JSX.Element {
       setMarginLoanRatePct(5);
     }
   }, [selectedTickers]);
+
+  const runOptimizer = useCallback(
+    (goal: OptimizeGoal) => {
+      if (selectedTickers.length < 2) return;
+      setOptimizing(goal);
+      setOptProgress(0);
+      // Defer so the spinner shows. runBacktest is synchronous and heavy;
+      // we chunk the work via setTimeout between phases.
+      setTimeout(() => {
+        const res = optimizePortfolio(simulationInput, allPrices, goal, (p) => setOptProgress(p));
+        if (res) {
+          const newWeights: Record<string, number> = {};
+          for (let i = 0; i < selectedTickers.length; i++) {
+            newWeights[selectedTickers[i]] = res.weights[i] ?? 0;
+          }
+          setWeights(newWeights);
+          setMarginEnabled(res.marginEnabled);
+          setMarginLeverage(res.marginLeverage);
+          if (res.marginEnabled) {
+            setMarginRebalance(true);
+            setMarginRebalanceMode("bidirectional");
+          }
+        }
+        setOptimizing(null);
+        setOptProgress(0);
+      }, 50);
+    },
+    [selectedTickers, simulationInput, allPrices]
+  );
 
   const fetchCustomTicker = useCallback(async (ticker: string) => {
     setCustomLoading(true);
@@ -1653,6 +1825,17 @@ function PortfolioAllocatorInner(): JSX.Element {
                   {t("alloc.preset.nasdaq2x")}
                 </Button>
               </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button size="xs" variant="secondary" onClick={() => runOptimizer("cagr")} disabled={optimizing !== null} className="bg-emerald-900/40 text-emerald-300 border border-emerald-700/40 hover:bg-emerald-800/50 disabled:opacity-50">
+                  {optimizing === "cagr" ? `${t("alloc.optimize.running")} ${Math.round(optProgress * 100)}%` : t("alloc.optimize.cagr")}
+                </Button>
+                <Button size="xs" variant="secondary" onClick={() => runOptimizer("sharpe")} disabled={optimizing !== null} className="bg-sky-900/40 text-sky-300 border border-sky-700/40 hover:bg-sky-800/50 disabled:opacity-50">
+                  {optimizing === "sharpe" ? `${t("alloc.optimize.running")} ${Math.round(optProgress * 100)}%` : t("alloc.optimize.sharpe")}
+                </Button>
+                <Button size="xs" variant="secondary" onClick={() => runOptimizer("minVol")} disabled={optimizing !== null} className="bg-rose-900/40 text-rose-300 border border-rose-700/40 hover:bg-rose-800/50 disabled:opacity-50">
+                  {optimizing === "minVol" ? `${t("alloc.optimize.running")} ${Math.round(optProgress * 100)}%` : t("alloc.optimize.minVol")}
+                </Button>
+              </div>
             </Card>
           )}
 
@@ -1745,7 +1928,7 @@ function PortfolioAllocatorInner(): JSX.Element {
                   <Text className="text-tremor-content dark:text-slate-500 text-xs mb-3">
                     {t("alloc.col.config.margin.explain", { loan: formatEUR(loanPreview, lang), leverage: marginLeverage.toFixed(2) })}
                   </Text>
-                  <Grid numItems={1} numItemsSm={3} className="gap-4">
+                  <Grid numItems={1} numItemsSm={2} className="gap-4">
                     <Col>
                       <LabelWithHelp labelKey="alloc.col.config.margin.leverage" helpKey="alloc.col.config.margin.leverage.help">
                         <NumberInput
@@ -1770,6 +1953,8 @@ function PortfolioAllocatorInner(): JSX.Element {
                         />
                       </LabelWithHelp>
                     </Col>
+                  </Grid>
+                  <Grid numItems={1} numItemsSm={2} className="gap-4 mt-4">
                     <Col>
                       <LabelWithHelp labelKey="alloc.col.config.margin.freq" helpKey="alloc.col.config.margin.freq.help">
                         <Select
@@ -1780,6 +1965,18 @@ function PortfolioAllocatorInner(): JSX.Element {
                           <SelectItem value="monthly">{t("alloc.col.config.margin.freqMonthly")}</SelectItem>
                           <SelectItem value="yearly">{t("alloc.col.config.margin.freqYearly")}</SelectItem>
                         </Select>
+                      </LabelWithHelp>
+                    </Col>
+                    <Col>
+                      <LabelWithHelp labelKey="alloc.col.config.margin.maint" helpKey="alloc.col.config.margin.maint.help">
+                        <NumberInput
+                          value={marginMaintenancePct}
+                          onValueChange={(v) => setMarginMaintenancePct(Math.max(10, Math.min(50, v ?? 25)))}
+                          min={10}
+                          max={50}
+                          step={1}
+                          className="bg-slate-900 border-slate-800 text-slate-200"
+                        />
                       </LabelWithHelp>
                     </Col>
                   </Grid>
