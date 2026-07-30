@@ -313,6 +313,71 @@ function ComptesBanquesInner({ mode }: ComptesBanquesProps) {
   );
 
   // ── Margin loans tab ──
+  const LiqCalc = () => {
+    const { t } = useI18n();
+    const [equityStr, setEquityStr] = useState("50000");
+    const [lev, setLev] = useState(2);
+    const [mm, setMm] = useState(30);
+
+    const equity = Math.max(100, parseFloat(equityStr) || 0);
+    const total = equity * lev;
+    const loan = total - equity;
+    const liqPrice = mm < 100 ? loan / (1 - mm / 100) : 0;
+    const maxDropPct = total > 0 ? (1 - liqPrice / total) * 100 : 0;
+    const isLiquidating = liqPrice >= total;
+
+    return (
+      <div className="mt-3 rounded-lg border border-slate-700/50 bg-slate-900/40 p-3">
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-slate-500">{t("cb.margin.liqCalc.equity")}</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={equityStr}
+              onChange={(e) => setEquityStr(e.target.value.replace(/[^0-9.]/g, ""))}
+              onBlur={() => { const v = parseFloat(equityStr) || 0; setEquityStr(Math.max(100, Math.min(10000000, v)).toString()); }}
+              className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-100 tabular-nums focus:border-amber-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-slate-500">{t("cb.margin.liqCalc.leverage")}: <span className="text-amber-300 tabular-nums">{lev.toFixed(1)}x</span></label>
+            <input type="range" min="1" max="5" step="0.5" value={lev} onChange={(e) => setLev(parseFloat(e.target.value))} className="w-full accent-amber-500" />
+          </div>
+          <div>
+            <label className="mb-1 block text-[10px] font-medium text-slate-500">{t("cb.margin.liqCalc.maintMargin")}: <span className="text-amber-300 tabular-nums">{mm}%</span></label>
+            <input type="range" min="10" max="50" step="1" value={mm} onChange={(e) => setMm(parseInt(e.target.value))} className="w-full accent-amber-500" />
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <div className="rounded-md border border-slate-700/50 bg-slate-800/30 p-2">
+            <div className="text-[10px] text-slate-500">{t("cb.margin.liqCalc.total")}</div>
+            <div className="text-sm font-semibold text-slate-200 tabular-nums">{total.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} €</div>
+          </div>
+          <div className="rounded-md border border-slate-700/50 bg-slate-800/30 p-2">
+            <div className="text-[10px] text-slate-500">{t("cb.margin.liqCalc.loan")}</div>
+            <div className="text-sm font-semibold text-amber-300 tabular-nums">{loan.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} €</div>
+          </div>
+          <div className={`rounded-md border p-2 ${isLiquidating ? "border-rose-700/50 bg-rose-950/30" : "border-rose-700/40 bg-rose-950/20"}`}>
+            <div className="text-[10px] text-slate-500">{t("cb.margin.liqCalc.liqPrice")}</div>
+            <div className="text-sm font-semibold text-rose-300 tabular-nums">{liqPrice.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} €</div>
+          </div>
+          <div className="rounded-md border border-rose-700/40 bg-rose-950/20 p-2">
+            <div className="text-[10px] text-slate-500">{t("cb.margin.liqCalc.maxDrop")}</div>
+            <div className="text-sm font-semibold text-rose-300 tabular-nums">{maxDropPct.toFixed(1)}%</div>
+          </div>
+          <div className={`rounded-md border p-2 ${isLiquidating ? "border-rose-700/50 bg-rose-950/30" : "border-emerald-700/40 bg-emerald-950/20"}`}>
+            <div className="text-[10px] text-slate-500">{t("cb.margin.liqCalc.status")}</div>
+            <div className={`text-xs font-semibold ${isLiquidating ? "text-rose-400" : "text-emerald-300"}`}>
+              {isLiquidating ? t("cb.margin.liqCalc.liquidated") : t("cb.margin.liqCalc.safe")}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const MarginTab = () => {
     // Local simulator state — clamps on blur/Enter only (same pattern as StepCard/InputField)
     const [equityStr, setEquityStr] = useState("10000");
@@ -492,6 +557,8 @@ function ComptesBanquesInner({ mode }: ComptesBanquesProps) {
             {t("cb.margin.formula.eq")}
           </div>
           <p className="text-xs text-slate-400 leading-relaxed">{t("cb.margin.formula.explain")}</p>
+
+          <LiqCalc />
         </div>
 
         <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
