@@ -386,7 +386,7 @@ function ComptesBanquesInner({ mode }: ComptesBanquesProps) {
     const [maintMargin, setMaintMargin] = useState(30);
     const [annualReturn, setAnnualReturn] = useState(8);
     const [years, setYears] = useState(10);
-    const [maxDrawdown, setMaxDrawdown] = useState(15);
+    const [maxDrawdown, setMaxDrawdown] = useState(10);
     const [drawdownYear, setDrawdownYear] = useState(2);
     const [releverageMode, setReleverageMode] = useState<"none" | "gains-only" | "bidirectional">("bidirectional");
 
@@ -594,7 +594,7 @@ function ComptesBanquesInner({ mode }: ComptesBanquesProps) {
               <input type="range" min="1" max="30" step="1" value={years} onChange={(e) => setYears(parseInt(e.target.value))} className="w-full accent-orange-500" />
             </SimParam>
             <SimParam helpKey="cb.margin.sim.maxDrawdown.help" label={<>{t("cb.margin.sim.maxDrawdown")}: <span className="text-rose-300 tabular-nums">{maxDrawdown}%</span></>}>
-              <input type="range" min="0" max="80" step="5" value={maxDrawdown} onChange={(e) => setMaxDrawdown(parseInt(e.target.value))} className="w-full accent-orange-500" />
+              <input type="range" min="1" max="20" step="1" value={maxDrawdown} onChange={(e) => setMaxDrawdown(parseInt(e.target.value))} className="w-full accent-orange-500" />
             </SimParam>
             <SimParam helpKey="cb.margin.sim.drawdownYear.help" label={<>{t("cb.margin.sim.drawdownYear")}: <span className="text-orange-300 tabular-nums">{drawdownYear}</span></>}>
               <input type="range" min="1" max={years} step="1" value={Math.min(drawdownYear, years)} onChange={(e) => setDrawdownYear(parseInt(e.target.value))} className="w-full accent-orange-500" />
