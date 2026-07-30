@@ -1969,14 +1969,22 @@ function PortfolioAllocatorInner(): JSX.Element {
                     </Col>
                     <Col>
                       <LabelWithHelp labelKey="alloc.col.config.margin.maint" helpKey="alloc.col.config.margin.maint.help">
-                        <NumberInput
-                          value={marginMaintenancePct}
-                          onValueChange={(v) => setMarginMaintenancePct(Math.max(10, Math.min(50, v ?? 25)))}
-                          min={10}
-                          max={50}
-                          step={1}
-                          className="bg-slate-900 border-slate-800 text-slate-200"
-                        />
+                        <div className="flex items-center gap-2">
+                          <NumberInput
+                            value={marginMaintenancePct}
+                            onValueChange={(v) => setMarginMaintenancePct(Math.max(10, Math.min(50, v ?? 25)))}
+                            min={10}
+                            max={50}
+                            step={1}
+                            className="bg-slate-900 border-slate-800 text-slate-200"
+                          />
+                          <a
+                            href="/FFunds/comptes#margin"
+                            className="shrink-0 whitespace-nowrap rounded-md border border-orange-500/40 bg-orange-500/10 px-2 py-1 text-[10px] font-medium text-orange-300 transition-colors hover:bg-orange-500/20"
+                          >
+                            {t("alloc.col.config.margin.maint.explain")}
+                          </a>
+                        </div>
                       </LabelWithHelp>
                     </Col>
                   </Grid>

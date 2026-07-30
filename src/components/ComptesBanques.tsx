@@ -1,8 +1,20 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { I18nProvider, useI18n } from "../i18n/I18nProvider";
+import {
+  ComposedChart,
+  Area,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+  Legend,
+} from "recharts";
 
 type Mode = "comptes" | "banques";
-type TabKey = "ctoPea" | "brokers" | "banksFr" | "banksEu" | "banksWorld";
+type TabKey = "ctoPea" | "brokers" | "margin" | "banksFr" | "banksEu" | "banksWorld";
 
 interface ComptesBanquesProps {
   mode: Mode;
@@ -90,6 +102,7 @@ function ComptesBanquesInner({ mode }: ComptesBanquesProps) {
   const COMPTES_TABS: { key: TabKey; labelKey: string }[] = [
     { key: "ctoPea", labelKey: "cb.tab.ctoPea" },
     { key: "brokers", labelKey: "cb.tab.brokers" },
+    { key: "margin", labelKey: "cb.tab.margin" },
   ];
   const BANQUES_TABS: { key: TabKey; labelKey: string }[] = [
     { key: "banksFr", labelKey: "cb.tab.banks.fr" },
@@ -98,6 +111,13 @@ function ComptesBanquesInner({ mode }: ComptesBanquesProps) {
   ];
   const TABS = mode === "comptes" ? COMPTES_TABS : BANQUES_TABS;
   const [tab, setTab] = useState<TabKey>(TABS[0].key);
+
+  useEffect(() => {
+    const hash = window.location.hash.replace("#", "");
+    if (hash && TABS.some((tabDef) => tabDef.key === hash)) {
+      setTab(hash as TabKey);
+    }
+  }, []);
 
   // ── CTO/PEA tab ──
   const CtoPeaTab = () => (
@@ -292,7 +312,341 @@ function ComptesBanquesInner({ mode }: ComptesBanquesProps) {
     </div>
   );
 
-  // ── Banks tabs ──
+  // ── Margin loans tab ──
+  const MarginTab = () => {
+    // Local simulator state — clamps on blur/Enter only (same pattern as StepCard/InputField)
+    const [equityStr, setEquityStr] = useState("10000");
+    const [leverage, setLeverage] = useState(2);
+    const [loanRate, setLoanRate] = useState(4);
+    const [maintMargin, setMaintMargin] = useState(30);
+    const [annualReturn, setAnnualReturn] = useState(8);
+    const [years, setYears] = useState(10);
+    const [maxDrawdown, setMaxDrawdown] = useState(15);
+    const [drawdownYear, setDrawdownYear] = useState(2);
+    const [releverageMode, setReleverageMode] = useState<"none" | "gains-only" | "bidirectional">("bidirectional");
+
+    const equity = parseFloat(equityStr) || 0;
+    const initialLoan = equity * (leverage - 1);
+    const initialTotal = equity * leverage;
+    const targetLoanRatio = leverage > 0 ? (leverage - 1) / leverage : 0;
+
+    // Liquidation price: V_liq = D / (1 - MM)
+    const liquidationValue = maintMargin < 100 ? initialLoan / (1 - maintMargin / 100) : 0;
+    const liquidationDropPct = initialTotal > 0 ? (1 - liquidationValue / initialTotal) * 100 : 0;
+
+    // Monthly simulation with forced drawdown + re-leverage modes
+    const monthlyProjection = useMemo(() => {
+      const rows: { monthIdx: number; year: number; month: number; label: string; portfolioValue: number; loan: number; equity: number; interestPaid: number; status: "safe" | "warning" | "liquidated"; drawdownApplied: boolean }[] = [];
+      let portfolioValue = initialTotal;
+      let loan = initialLoan;
+      let totalInterest = 0;
+      const monthlyReturn = Math.pow(1 + annualReturn / 100, 1 / 12) - 1;
+      const monthlyInterestRate = loanRate / 100 / 12;
+      let drawdownApplied = false;
+      let liquidated = false;
+
+      for (let y = 1; y <= years && !liquidated; y++) {
+        for (let m = 1; m <= 12 && !liquidated; m++) {
+          const monthIdx = (y - 1) * 12 + m;
+
+          // Forced drawdown: apply once at the start of drawdownYear
+          if (!drawdownApplied && y >= drawdownYear && m === 1) {
+            portfolioValue = portfolioValue * (1 - maxDrawdown / 100);
+            drawdownApplied = true;
+          }
+
+          // Normal monthly growth (only if not the drawdown month)
+          if (!(drawdownApplied && y === drawdownYear && m === 1)) {
+            portfolioValue = portfolioValue * (1 + monthlyReturn);
+          }
+
+          // Interest accrues on loan (capitalized monthly)
+          const monthlyInterest = loan * monthlyInterestRate;
+          totalInterest += monthlyInterest;
+          loan = loan + monthlyInterest;
+
+          let currentEquity = portfolioValue - loan;
+          const maintenanceThreshold = (maintMargin / 100) * portfolioValue;
+
+          // Liquidation check
+          if (currentEquity <= maintenanceThreshold || currentEquity <= 0) {
+            rows.push({ monthIdx, year: y, month: m, label: `Y${y}M${m}`, portfolioValue, loan, equity: currentEquity, interestPaid: totalInterest, status: "liquidated", drawdownApplied });
+            liquidated = true;
+            break;
+          }
+
+          // Re-leverage adjustment (after growth + interest, before next month)
+          if (releverageMode !== "none" && leverage > 1) {
+            const targetLoan = portfolioValue * targetLoanRatio;
+            if (releverageMode === "bidirectional") {
+              loan = targetLoan;
+            } else if (releverageMode === "gains-only" && targetLoan > loan) {
+              loan = targetLoan;
+            }
+          }
+          currentEquity = portfolioValue - loan;
+
+          let status: "safe" | "warning" | "liquidated" = "safe";
+          if (currentEquity <= maintenanceThreshold * 1.2) {
+            status = "warning";
+          }
+          rows.push({ monthIdx, year: y, month: m, label: `Y${y}M${String(m).padStart(2, "0")}`, portfolioValue, loan, equity: currentEquity, interestPaid: totalInterest, status, drawdownApplied });
+        }
+      }
+      return rows;
+    }, [initialTotal, initialLoan, annualReturn, loanRate, maintMargin, years, maxDrawdown, drawdownYear, releverageMode, leverage, targetLoanRatio]);
+
+    // Yearly projection derived from monthly rows (for summary cards)
+    const projection = useMemo(() => {
+      const byYear = new Map<number, { year: number; monthIdx: number; portfolioValue: number; loan: number; equity: number; interestPaid: number; status: "safe" | "warning" | "liquidated"; drawdownApplied: boolean }>();
+      for (const r of monthlyProjection) {
+        const existing = byYear.get(r.year);
+        if (!existing || r.monthIdx > existing.monthIdx || r.status === "liquidated") {
+          byYear.set(r.year, { year: r.year, monthIdx: r.monthIdx, portfolioValue: r.portfolioValue, loan: r.loan, equity: r.equity, interestPaid: r.interestPaid, status: r.status, drawdownApplied: r.drawdownApplied });
+        }
+      }
+      return Array.from(byYear.values()).sort((a, b) => a.year - b.year);
+    }, [monthlyProjection]);
+
+    const finalRow = projection[projection.length - 1];
+    const isLiquidated = finalRow?.status === "liquidated";
+    const liquidationYear = projection.find((r) => r.status === "liquidated")?.year;
+    const RELEV_MODES: { key: "none" | "gains-only" | "bidirectional"; labelKey: string }[] = [
+      { key: "none", labelKey: "cb.margin.sim.relevNone" },
+      { key: "gains-only", labelKey: "cb.margin.sim.relevGains" },
+      { key: "bidirectional", labelKey: "cb.margin.sim.relevBi" },
+    ];
+
+    const SimParam = ({ helpKey, label, children }: { helpKey: string; label: React.ReactNode; children: React.ReactNode }) => (
+      <div className="group relative">
+        <label className="mb-1 block text-xs font-medium text-slate-400">{label}</label>
+        {children}
+        <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 w-56 -translate-x-1/2 rounded-lg border border-slate-700 bg-slate-900 p-2.5 text-[11px] leading-relaxed text-slate-300 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
+          {t(helpKey)}
+        </span>
+      </div>
+    );
+
+    return (
+      <div className="space-y-5">
+        <div className="rounded-xl border border-orange-800/40 bg-orange-950/15 p-5">
+          <h3 className="mb-2 text-base font-semibold text-orange-300">{t("cb.margin.title")}</h3>
+          <p className="mb-3 text-sm text-slate-300 leading-relaxed">{t("cb.margin.intro")}</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-3">
+              <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-400">{t("cb.margin.howItWorks")}</h4>
+              <p className="text-xs text-slate-400 leading-relaxed">{t("cb.margin.howItWorksDesc")}</p>
+            </div>
+            <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-3">
+              <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-rose-400">{t("cb.margin.risks")}</h4>
+              <p className="text-xs text-slate-400 leading-relaxed">{t("cb.margin.risksDesc")}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          {[
+            { key: "equity", title: t("cb.margin.concept.equity"), desc: t("cb.margin.concept.equityDesc") },
+            { key: "maintenance", title: t("cb.margin.concept.maintenance"), desc: t("cb.margin.concept.maintenanceDesc") },
+            { key: "call", title: t("cb.margin.concept.call"), desc: t("cb.margin.concept.callDesc") },
+          ].map((c) => (
+            <div key={c.key} className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
+              <h4 className="mb-1.5 text-sm font-semibold text-slate-100">{c.title}</h4>
+              <p className="text-xs text-slate-400 leading-relaxed">{c.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="rounded-xl border border-indigo-800/40 bg-indigo-950/15 p-5">
+          <h3 className="mb-3 text-base font-semibold text-indigo-300">{t("cb.margin.regTvsPm.title")}</h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-4">
+              <h4 className="mb-2 text-sm font-semibold text-slate-100">{t("cb.margin.regT.title")}</h4>
+              <ul className="space-y-1.5 text-xs text-slate-400">
+                {[1, 2, 3, 4].map((i) => (
+                  <li key={i} className="flex gap-2 leading-relaxed">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-500" />
+                    <span>{t(`cb.margin.regT.${i}`)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="rounded-lg border border-indigo-700/40 bg-indigo-900/20 p-4">
+              <h4 className="mb-2 text-sm font-semibold text-indigo-200">{t("cb.margin.pm.title")}</h4>
+              <ul className="space-y-1.5 text-xs text-slate-400">
+                {[1, 2, 3, 4].map((i) => (
+                  <li key={i} className="flex gap-2 leading-relaxed">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />
+                    <span>{t(`cb.margin.pm.${i}`)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-slate-500 leading-relaxed">{t("cb.margin.regTvsPm.note")}</p>
+        </div>
+
+        <div className="rounded-lg border border-amber-800/40 bg-amber-950/20 p-4">
+          <h4 className="mb-2 text-sm font-semibold text-amber-300">{t("cb.margin.formula.title")}</h4>
+          <div className="mb-2 rounded-md bg-slate-900/60 p-3 font-mono text-xs text-slate-300">
+            {t("cb.margin.formula.eq")}
+          </div>
+          <p className="text-xs text-slate-400 leading-relaxed">{t("cb.margin.formula.explain")}</p>
+        </div>
+
+        <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
+          <h3 className="mb-4 text-base font-semibold text-slate-100">{t("cb.margin.sim.title")}</h3>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <SimParam helpKey="cb.margin.sim.equity.help" label={t("cb.margin.sim.equity")}>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={equityStr}
+                onChange={(e) => setEquityStr(e.target.value.replace(/[^0-9.]/g, ""))}
+                onBlur={() => {
+                  const v = parseFloat(equityStr) || 0;
+                  setEquityStr(Math.max(100, Math.min(10000000, v)).toString());
+                }}
+                className="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 tabular-nums focus:border-orange-500 focus:outline-none"
+              />
+            </SimParam>
+            <SimParam helpKey="cb.margin.sim.leverage.help" label={<>{t("cb.margin.sim.leverage")}: <span className="text-orange-300 tabular-nums">{leverage.toFixed(1)}x</span></>}>
+              <input type="range" min="1" max="5" step="0.5" value={leverage} onChange={(e) => setLeverage(parseFloat(e.target.value))} className="w-full accent-orange-500" />
+            </SimParam>
+            <SimParam helpKey="cb.margin.sim.loanRate.help" label={<>{t("cb.margin.sim.loanRate")}: <span className="text-orange-300 tabular-nums">{loanRate.toFixed(1)}%</span></>}>
+              <input type="range" min="0" max="15" step="0.5" value={loanRate} onChange={(e) => setLoanRate(parseFloat(e.target.value))} className="w-full accent-orange-500" />
+            </SimParam>
+            <SimParam helpKey="cb.margin.sim.maintMargin.help" label={<>{t("cb.margin.sim.maintMargin")}: <span className="text-orange-300 tabular-nums">{maintMargin}%</span></>}>
+              <input type="range" min="10" max="50" step="1" value={maintMargin} onChange={(e) => setMaintMargin(parseInt(e.target.value))} className="w-full accent-orange-500" />
+            </SimParam>
+            <SimParam helpKey="cb.margin.sim.annualReturn.help" label={<>{t("cb.margin.sim.annualReturn")}: <span className={`tabular-nums ${annualReturn >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{annualReturn > 0 ? "+" : ""}{annualReturn}%</span></>}>
+              <input type="range" min="-50" max="50" step="1" value={annualReturn} onChange={(e) => setAnnualReturn(parseInt(e.target.value))} className="w-full accent-orange-500" />
+            </SimParam>
+            <SimParam helpKey="cb.margin.sim.years.help" label={<>{t("cb.margin.sim.years")}: <span className="text-orange-300 tabular-nums">{years}</span></>}>
+              <input type="range" min="1" max="30" step="1" value={years} onChange={(e) => setYears(parseInt(e.target.value))} className="w-full accent-orange-500" />
+            </SimParam>
+            <SimParam helpKey="cb.margin.sim.maxDrawdown.help" label={<>{t("cb.margin.sim.maxDrawdown")}: <span className="text-rose-300 tabular-nums">{maxDrawdown}%</span></>}>
+              <input type="range" min="0" max="80" step="5" value={maxDrawdown} onChange={(e) => setMaxDrawdown(parseInt(e.target.value))} className="w-full accent-orange-500" />
+            </SimParam>
+            <SimParam helpKey="cb.margin.sim.drawdownYear.help" label={<>{t("cb.margin.sim.drawdownYear")}: <span className="text-orange-300 tabular-nums">{drawdownYear}</span></>}>
+              <input type="range" min="1" max={years} step="1" value={Math.min(drawdownYear, years)} onChange={(e) => setDrawdownYear(parseInt(e.target.value))} className="w-full accent-orange-500" />
+            </SimParam>
+            <SimParam helpKey="cb.margin.sim.relevMode.help" label={t("cb.margin.sim.relevMode")}>
+              <div className="flex gap-1">
+                {RELEV_MODES.map((m) => (
+                  <button
+                    key={m.key}
+                    onClick={() => setReleverageMode(m.key)}
+                    className={`flex-1 rounded-md px-2 py-1.5 text-[10px] font-medium transition-all ${
+                      releverageMode === m.key
+                        ? "bg-orange-500/20 text-orange-300 border border-orange-500/40"
+                        : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200"
+                    }`}
+                  >
+                    {t(m.labelKey)}
+                  </button>
+                ))}
+              </div>
+            </SimParam>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-3">
+              <div className="text-xs text-slate-500">{t("cb.margin.sim.totalInvested")}</div>
+              <div className="mt-0.5 text-lg font-semibold text-slate-100 tabular-nums">{initialTotal.toLocaleString("fr-FR")} €</div>
+            </div>
+            <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-3">
+              <div className="text-xs text-slate-500">{t("cb.margin.sim.loanAmount")}</div>
+              <div className="mt-0.5 text-lg font-semibold text-amber-300 tabular-nums">{initialLoan.toLocaleString("fr-FR")} €</div>
+            </div>
+            <div className="rounded-lg border border-rose-700/40 bg-rose-950/20 p-3">
+              <div className="text-xs text-slate-500">{t("cb.margin.sim.liqThreshold")}</div>
+              <div className="mt-0.5 text-lg font-semibold text-rose-300 tabular-nums">{liquidationDropPct.toFixed(1)}%</div>
+              <div className="text-[10px] text-slate-500">{t("cb.margin.sim.liqAtValue")} {liquidationValue.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} €</div>
+            </div>
+            <div className={`rounded-lg border p-3 ${isLiquidated ? "border-rose-700/50 bg-rose-950/30" : "border-emerald-700/40 bg-emerald-950/20"}`}>
+              <div className="text-xs text-slate-500">{t("cb.margin.sim.status")}</div>
+              <div className={`mt-0.5 text-sm font-semibold ${isLiquidated ? "text-rose-300" : "text-emerald-300"}`}>
+                {isLiquidated ? t("cb.margin.sim.statusLiquidated") + (liquidationYear ? ` (Y${liquidationYear})` : "") : t("cb.margin.sim.statusSafe")}
+              </div>
+            </div>
+          </div>
+
+          {monthlyProjection.length > 0 && (
+            <>
+              <div className="mt-5 max-h-72 overflow-y-auto overflow-x-auto rounded-lg border border-slate-800">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="border-b border-slate-700 bg-slate-900/95">
+                      <th className="px-3 py-2 font-semibold text-slate-300">{t("cb.margin.sim.col.month")}</th>
+                      <th className="px-3 py-2 font-semibold text-slate-300">{t("cb.margin.sim.col.portfolio")}</th>
+                      <th className="px-3 py-2 font-semibold text-slate-300">{t("cb.margin.sim.col.loan")}</th>
+                      <th className="px-3 py-2 font-semibold text-slate-300">{t("cb.margin.sim.col.equity")}</th>
+                      <th className="px-3 py-2 font-semibold text-slate-300">{t("cb.margin.sim.col.interest")}</th>
+                      <th className="px-3 py-2 font-semibold text-slate-300">{t("cb.margin.sim.col.status")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthlyProjection.map((r) => (
+                      <tr key={r.monthIdx} className={`border-b border-slate-800/60 ${r.status === "liquidated" ? "bg-rose-950/20" : r.status === "warning" ? "bg-amber-950/15" : ""} ${r.drawdownApplied && r.monthIdx === (drawdownYear - 1) * 12 + 1 ? "ring-1 ring-inset ring-rose-500/30" : ""}`}>
+                        <td className="px-3 py-1.5 font-medium text-slate-300 tabular-nums whitespace-nowrap">{r.label}{r.drawdownApplied && r.monthIdx === (drawdownYear - 1) * 12 + 1 ? " ↓" : ""}</td>
+                        <td className="px-3 py-1.5 text-slate-300 tabular-nums">{r.portfolioValue.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} €</td>
+                        <td className="px-3 py-1.5 text-amber-300/80 tabular-nums">{r.loan.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} €</td>
+                        <td className={`px-3 py-1.5 tabular-nums font-medium ${r.equity < 0 ? "text-rose-400" : "text-emerald-300"}`}>{r.equity.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} €</td>
+                        <td className="px-3 py-1.5 text-slate-500 tabular-nums">{r.interestPaid.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} €</td>
+                        <td className="px-3 py-1.5">
+                          {r.status === "liquidated" && <span className="rounded bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-rose-400">{t("cb.margin.sim.statusLiquidated")}</span>}
+                          {r.status === "warning" && <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-amber-400">{t("cb.margin.sim.statusWarning")}</span>}
+                          {r.status === "safe" && <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-emerald-400">{t("cb.margin.sim.statusSafe")}</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-5 h-72 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={monthlyProjection} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                    <XAxis dataKey="monthIdx" tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={(v) => `M${v}`} />
+                    <YAxis tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip
+                      contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8, fontSize: 11 }}
+                      labelFormatter={(v) => `Mois ${v}`}
+                      formatter={(v) => `${Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 0 })} €`}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 10 }} />
+                    <ReferenceLine x={(drawdownYear - 1) * 12 + 1} stroke="#f43f5e" strokeDasharray="4 4" label={{ value: "↓", fill: "#f43f5e", fontSize: 12 }} />
+                    <Area type="monotone" dataKey="portfolioValue" name={t("cb.margin.sim.col.portfolio")} stroke="#60a5fa" fill="#60a5fa" fillOpacity={0.08} strokeWidth={1.5} />
+                    <Line type="monotone" dataKey="loan" name={t("cb.margin.sim.col.loan")} stroke="#fbbf24" strokeWidth={1.5} dot={false} />
+                    <Line type="monotone" dataKey="equity" name={t("cb.margin.sim.col.equity")} stroke="#34d399" strokeWidth={1.5} dot={false} />
+                    <Line type="monotone" dataKey="interestPaid" name={t("cb.margin.sim.col.interest")} stroke="#94a3b8" strokeWidth={1} strokeDasharray="2 3" dot={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </>
+          )}
+
+          <p className="mt-4 text-xs text-slate-500 leading-relaxed">{t("cb.margin.sim.disclaimer")}</p>
+        </div>
+
+        <div className="rounded-xl border border-sky-800/40 bg-sky-950/15 p-5">
+          <h3 className="mb-3 text-base font-semibold text-sky-300">{t("cb.margin.bestPractices")}</h3>
+          <ul className="space-y-2 text-sm text-slate-400">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <li key={i} className="flex gap-2">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" />
+                <span className="leading-relaxed">{t(`cb.margin.tip.${i}`)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  };
+
   const BanksTable = ({
     banks,
     scope,
@@ -391,6 +745,7 @@ function ComptesBanquesInner({ mode }: ComptesBanquesProps) {
 
       {tab === "ctoPea" && <CtoPeaTab />}
       {tab === "brokers" && <BrokersTab />}
+      {tab === "margin" && <MarginTab />}
       {tab === "banksFr" && <BanksFrTab />}
       {tab === "banksEu" && <BanksEuTab />}
       {tab === "banksWorld" && <BanksWorldTab />}
