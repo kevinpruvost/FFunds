@@ -104,6 +104,8 @@ interface BacktestResult {
   endMonth: string;
   limitingTicker: string;
   limitingTickerName: string;
+  limitingEndTicker: string;
+  limitingEndTickerName: string;
   months: string[];
   // Gross asset value held (equity + loan when margin is on).
   portfolioValue: number[];
@@ -290,6 +292,8 @@ function intersectPeriod(prices: PricesMap, tickers: string[]) {
       endMonth: "",
       limitingTicker: "",
       limitingTickerName: "",
+      limitingEndTicker: "",
+      limitingEndTickerName: "",
       months: [] as string[],
       lookups: [] as Record<string, number>[],
     };
@@ -298,6 +302,7 @@ function intersectPeriod(prices: PricesMap, tickers: string[]) {
   let maxStart = "";
   let minEnd = "";
   let limitingTicker = "";
+  let limitingEndTicker = "";
 
   for (const t of tickers) {
     if (t === "CASH") continue;
@@ -309,12 +314,16 @@ function intersectPeriod(prices: PricesMap, tickers: string[]) {
     }
     if (minEnd === "" || hist.endDate < minEnd) {
       minEnd = hist.endDate;
+      limitingEndTicker = t;
     }
   }
 
   const limitingTickerName =
     TICKERS.find((t) => t.ticker === limitingTicker)?.name ??
     limitingTicker;
+  const limitingEndTickerName =
+    TICKERS.find((t) => t.ticker === limitingEndTicker)?.name ??
+    limitingEndTicker;
 
   const months: string[] = [];
   let cur = maxStart;
@@ -340,7 +349,7 @@ function intersectPeriod(prices: PricesMap, tickers: string[]) {
     return map;
   });
 
-  return { startMonth: maxStart, endMonth: minEnd, limitingTicker, limitingTickerName, months, lookups };
+  return { startMonth: maxStart, endMonth: minEnd, limitingTicker, limitingTickerName, limitingEndTicker, limitingEndTickerName, months, lookups };
 }
 
 function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResult | null {
@@ -366,7 +375,7 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
   } = input;
   if (tickers.length === 0) return null;
 
-  const { startMonth, endMonth, limitingTicker, limitingTickerName, months: allMonths, lookups } = intersectPeriod(allPrices, tickers);
+  const { startMonth, endMonth, limitingTicker, limitingTickerName, limitingEndTicker, limitingEndTickerName, months: allMonths, lookups } = intersectPeriod(allPrices, tickers);
   if (allMonths.length === 0) return null;
 
   // Apply time window filter on top of the ticker-intersected period.
@@ -597,6 +606,8 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
     endMonth: winEnd,
     limitingTicker,
     limitingTickerName,
+    limitingEndTicker,
+    limitingEndTickerName,
     months,
     portfolioValue,
     equityValue,
@@ -1553,7 +1564,16 @@ function PortfolioAllocatorInner(): JSX.Element {
       {result && (
         <Callout title={t("alloc.callout.period.title")} color="emerald" className="border-emerald-800 bg-emerald-950/40">
           <Text className="text-emerald-300">
-            {t("alloc.callout.period.body", { start: result.startMonth, end: result.endMonth, months: String(result.months.length), name: result.limitingTickerName, ticker: result.limitingTicker })}
+            {t("alloc.callout.period.body", {
+              start: result.startMonth,
+              end: result.endMonth,
+              months: String(result.months.length),
+              name: result.limitingTickerName,
+              ticker: result.limitingTicker,
+              endLimiter: result.limitingEndTicker && result.limitingEndTicker !== result.limitingTicker
+                ? `, fin limitée par ${result.limitingEndTickerName} (${result.limitingEndTicker})`
+                : "",
+            })}
           </Text>
         </Callout>
       )}
