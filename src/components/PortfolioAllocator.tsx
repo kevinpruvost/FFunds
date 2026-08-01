@@ -756,6 +756,53 @@ function optimizePortfolio(
 
 // Module-scope helpers (defined OUTSIDE PortfolioAllocatorInner so React doesn't
 // remount the subtree on each state change — causes NumberInput defocus bug).
+
+// Text-based numeric input: local string state, commit on blur/Enter.
+// Avoids Tremor NumberInput clamp-on-keystroke that prevents clearing the field.
+const NumberInputField = ({
+  value,
+  onCommit,
+  min,
+  max,
+  step = 1,
+  className = "",
+}: {
+  value: number;
+  onCommit: (v: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  className?: string;
+}) => {
+  const [local, setLocal] = useState(value === 0 ? "" : String(value));
+  useEffect(() => {
+    setLocal(value === 0 ? "" : String(value));
+  }, [value]);
+  const commit = () => {
+    if (local === "") {
+      onCommit(0);
+      return;
+    }
+    let v = parseFloat(local);
+    if (isNaN(v)) v = value;
+    if (min !== undefined) v = Math.max(min, v);
+    if (max !== undefined) v = Math.min(max, v);
+    onCommit(v);
+    setLocal(v === 0 ? "" : String(v));
+  };
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } }}
+      className={`w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100 outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/30 ${className}`}
+    />
+  );
+};
+
 const LabelWithHelp = ({ labelKey, helpKey, children }: { labelKey: string; helpKey: string; children?: React.ReactNode }) => {
   const { t } = useI18n();
   return (
@@ -1322,6 +1369,47 @@ function PortfolioAllocatorInner(): JSX.Element {
       };
     });
   }, [selectedTickers, weights, allTickers]);
+
+  const correlationMatrix = useMemo(() => {
+    const tickers = selectedTickers;
+    if (tickers.length < 2) return null;
+
+    const { months: allMonths, lookups } = intersectPeriod(allPrices, tickers);
+    if (allMonths.length < 2) return null;
+
+    // Per-ticker monthly returns
+    const returns: Record<string, number[]> = {};
+    tickers.forEach((ticker, i) => {
+      const lookup = lookups[i];
+      const r: number[] = [];
+      for (let m = 1; m < allMonths.length; m++) {
+        const prev = lookup[allMonths[m - 1]];
+        const cur = lookup[allMonths[m]];
+        if (prev && cur && prev > 0) {
+          r.push(cur / prev - 1);
+        }
+      }
+      returns[ticker] = r;
+    });
+
+    // Pearson correlation
+    const corr = (a: number[], b: number[]): number => {
+      const n = Math.min(a.length, b.length);
+      if (n < 2) return 0;
+      let sa = 0, sb = 0, sab = 0, sa2 = 0, sb2 = 0;
+      for (let i = 0; i < n; i++) {
+        sa += a[i]; sb += b[i]; sab += a[i] * b[i];
+        sa2 += a[i] * a[i]; sb2 += b[i] * b[i];
+      }
+      const num = n * sab - sa * sb;
+      const den = Math.sqrt((n * sa2 - sa * sa) * (n * sb2 - sb * sb));
+      return den === 0 ? 0 : num / den;
+    };
+
+    return tickers.map((t1) =>
+      tickers.map((t2) => (t1 === t2 ? 1 : corr(returns[t1] ?? [], returns[t2] ?? [])))
+    );
+  }, [selectedTickers, allPrices]);
 
   const yearlyChartData = useMemo(() => {
     if (!result) return [];
@@ -1970,13 +2058,12 @@ function PortfolioAllocatorInner(): JSX.Element {
                     <Col>
                       <LabelWithHelp labelKey="alloc.col.config.margin.maint" helpKey="alloc.col.config.margin.maint.help">
                         <div className="flex items-center gap-2">
-                          <NumberInput
+                          <NumberInputField
                             value={marginMaintenancePct}
-                            onValueChange={(v) => setMarginMaintenancePct(Math.max(10, Math.min(50, v ?? 25)))}
+                            onCommit={(v) => setMarginMaintenancePct(v)}
                             min={10}
                             max={50}
                             step={1}
-                            className="bg-slate-900 border-slate-800 text-slate-200"
                           />
                           <a
                             href="/FFunds/comptes#margin"
@@ -2175,7 +2262,7 @@ function PortfolioAllocatorInner(): JSX.Element {
                   <TabList className="bg-slate-800/50 border-slate-700/50">
                     <Tab className="text-slate-400 data-[selected]:text-emerald-400 data-[selected]:border-b-emerald-400">{t("alloc.chart.performance")}</Tab>
                     <Tab className="text-slate-400 data-[selected]:text-emerald-400 data-[selected]:border-b-emerald-400">{t("alloc.chart.drawdown")}</Tab>
-                    <Tab className="text-slate-400 data-[selected]:text-emerald-400 data-[selected]:border-b-emerald-400">{t("alloc.chart.allocation")}</Tab>
+                    <Tab className="text-slate-400 data-[selected]:text-emerald-400 data-[selected]:border-b-emerald-400">{t("alloc.chart.correlation")}</Tab>
                     <Tab className="text-slate-400 data-[selected]:text-emerald-400 data-[selected]:border-b-emerald-400">{t("alloc.chart.yearly")}</Tab>
                   </TabList>
                   <TabPanels>
@@ -2367,24 +2454,52 @@ function PortfolioAllocatorInner(): JSX.Element {
 
                     <TabPanel>
                       <div className="mt-4">
-                        <Text className="text-tremor-content dark:text-slate-400 text-sm mb-2">{t("alloc.chart.allocationByAsset")}</Text>
-                        <ResponsiveContainer width="100%" height={320}>
-                          <BarChart data={allocationChartData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                            <XAxis dataKey="asset" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-                            <YAxis
-                              tick={{ fill: "#94a3b8", fontSize: 12 }}
-                              tickFormatter={(v: number) => `${v} %`}
-                              width={50}
-                            />
-                            <Tooltip content={<CustomTooltip />} />
-                            <Bar dataKey="allocation" radius={[4, 4, 0, 0]}>
-                              {allocationChartData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
+                        <Text className="text-tremor-content dark:text-slate-400 text-sm mb-2">{t("alloc.chart.correlationDesc")}</Text>
+                        {correlationMatrix ? (
+                          <div className="overflow-x-auto rounded-xl border border-slate-800">
+                            <table className="w-full text-center text-xs">
+                              <thead>
+                                <tr className="border-b border-slate-700 bg-slate-900/60">
+                                  <th className="px-2 py-2 font-semibold text-slate-500 sticky left-0 bg-slate-900/60"></th>
+                                  {selectedTickers.map((t) => {
+                                    const meta = allTickers.find((x) => x.ticker === t);
+                                    return <th key={t} className="px-2 py-2 font-semibold text-slate-300 whitespace-nowrap" title={meta?.name ?? t}>{meta?.name ?? t}</th>;
+                                  })}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {correlationMatrix.map((row, i) => {
+                                  const t1 = selectedTickers[i];
+                                  const meta1 = allTickers.find((x) => x.ticker === t1);
+                                  return (
+                                    <tr key={t1} className="border-b border-slate-800">
+                                      <td className="px-2 py-2 font-semibold text-slate-300 whitespace-nowrap sticky left-0 bg-slate-900/60" title={meta1?.name ?? t1}>{meta1?.name ?? t1}</td>
+                                      {row.map((v, j) => {
+                                        const pct = Math.round(v * 100);
+                                        const bg = v >= 0.7 ? `rgba(239,68,68,${0.15 + v * 0.55})`
+                                          : v >= 0.3 ? `rgba(251,191,36,${0.1 + v * 0.4})`
+                                          : v <= -0.3 ? `rgba(34,197,94,${0.15 + Math.abs(v) * 0.45})`
+                                          : "rgba(148,163,184,0.1)";
+                                        return (
+                                          <td key={j} className="px-2 py-2 tabular-nums" style={{ background: bg }} title={`${pct}%`}>
+                                            {pct}%
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <Text className="text-slate-500 text-xs mt-4">{t("alloc.chart.correlationNeed")}</Text>
+                        )}
+                        <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-500">
+                          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded" style={{ background: "rgba(239,68,68,0.6)" }} />{t("alloc.chart.correlationHigh")}</span>
+                          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded" style={{ background: "rgba(251,191,36,0.4)" }} />{t("alloc.chart.correlationMedium")}</span>
+                          <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded" style={{ background: "rgba(34,197,94,0.5)" }} />{t("alloc.chart.correlationLow")}</span>
+                        </div>
                       </div>
                     </TabPanel>
 
