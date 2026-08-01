@@ -229,12 +229,12 @@ function fmtCompact(n: number, lang: "fr" | "en"): string {
 
 const GOLDEN_TICKERS: Record<string, number> = {
   "MSCI-WORLD-MOMENTUM": 20,
-  "MSCI-WORLD-SMALL": 20,
+  "MSCI-WORLD-SMALL": 19,
   XLU: 10,
-  TLT: 19,
+  TLT: 14,
   SHY: 6,
-  KMLM: 10,
-  GLD: 15,
+  KMLM: 15,
+  GLD: 16,
 };
 
 const ALL_WEATHER_TICKERS: Record<string, number> = {
