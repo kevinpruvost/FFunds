@@ -638,7 +638,7 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
 
 /* ─────────────────────────── Component ─────────────────────────── */
 
-type OptimizeGoal = "cagr" | "sharpe" | "minVol";
+type OptimizeGoal = "cagr" | "sharpe" | "minVol" | "calmar" | "riskParity" | "blackLitterman";
 
 // Sample a random weight vector of length n that sums to 1 using Dirichlet-like
 // perturbation around a center. `concentration` controls how spread the samples are:
@@ -677,6 +677,139 @@ function sampleDirichlet(n: number, center: number[], concentration: number): nu
   return samples.map((v) => v / sum);
 }
 
+// Risk Parity: equal risk contribution. Each asset contributes the same
+// volatility to the portfolio. Solved iteratively: start from inverse-vol,
+// then rebalance toward equal marginal contributions (Spinu/Chaves formulation).
+function riskParityWeights(cov: number[][]): number[] {
+  const n = cov.length;
+  if (n === 0) return [];
+  if (n === 1) return [1];
+  // Init: inverse volatility weights
+  const invVol = cov.map((row, i) => 1 / Math.sqrt(Math.max(row[i], 1e-12)));
+  const sumInv = invVol.reduce((s, v) => s + v, 0);
+  let w = invVol.map((v) => v / sumInv);
+
+  // Iterative fixed-point: w_i ∝ (targetRisk_i / marginalContribution_i)
+  // For ERC, target = 1/n. Marginal contribution = (Σ w)_i / σ_p.
+  for (let iter = 0; iter < 200; iter++) {
+    const portVar = w.reduce((s, wi, i) => s + wi * cov[i].reduce((ss, cij, j) => ss + cij * w[j], 0), 0);
+    const portVol = Math.sqrt(Math.max(portVar, 1e-12));
+    // Risk contribution of asset i = w_i * (Σ w)_i / σ_p
+    const rc = w.map((wi, i) => {
+      const marginal = cov[i].reduce((ss, cij, j) => ss + cij * w[j], 0) / portVol;
+      return wi * marginal;
+    });
+    const target = portVol / n;
+    const newW = rc.map((r) => Math.max(1e-10, target / Math.max(r, 1e-12)));
+    const sum = newW.reduce((s, v) => s + v, 0);
+    const normalized = newW.map((v) => v / sum);
+    const diff = normalized.reduce((s, v, i) => s + Math.abs(v - w[i]), 0);
+    w = normalized;
+    if (diff < 1e-8) break;
+  }
+  return w;
+}
+
+// Black-Litterman: blend reverse-optimized equilibrium returns (prior) with
+// historical mean returns (views, confidence-weighted by inverse historical
+// variance). Posterior returns feed a mean-variance optimizer maximizing
+// Sharpe. τ = 0.05 confidence in prior; view confidence = 1/histVar.
+function blackLittermanWeights(cov: number[][], histMeans: number[], rf: number): number[] {
+  const n = cov.length;
+  if (n === 0) return [];
+  if (n === 1) return [1];
+
+  // Prior: equilibrium excess returns via reverse optimization on inverse-vol weights
+  const invVol = cov.map((row, i) => 1 / Math.sqrt(Math.max(row[i], 1e-12)));
+  const sumInv = invVol.reduce((s, v) => s + v, 0);
+  const wMkt = invVol.map((v) => v / sumInv);
+  const tau = 0.05;
+  // Π = δ * Σ * w_mkt  where δ = risk aversion. Use Sharpe-implied δ: (μ_p - rf)/σ_p²
+  const portRet = wMkt.reduce((s, wi, i) => s + wi * histMeans[i], 0);
+  const portVar = wMkt.reduce((s, wi, i) => s + wi * cov[i].reduce((ss, cij, j) => ss + cij * wMkt[j], 0), 0);
+  const delta = portVar > 1e-12 ? (portRet - rf) / portVar : 2;
+  const pi = cov.map((row, i) => delta * row.reduce((ss, cij, j) => ss + cij * wMkt[j], 0));
+
+  // Views = historical means. P = identity (each asset is its own view).
+  // View confidence Ω = diag(histVar). Black-Litterman posterior:
+  // μ_BL = [(τΣ)^-1 + Ω^-1]^-1 * [(τΣ)^-1 Π + Ω^-1 q]
+  const tauCov = cov.map((row) => row.map((v) => v * tau));
+  const omega = histMeans.map((_, i) => Math.max(cov[i][i] * 0.5, 1e-10));
+
+  // Invert (τΣ)^-1 + Ω^-1 via solving linear system (Gauss-Seidel for small n)
+  const invTauCov = invertMatrix(tauCov);
+  const invOmega = omega.map((o) => 1 / o);
+  // A = (τΣ)^-1 + Ω^-1 (diagonal Ω so just add to diagonal)
+  const A = invTauCov.map((row, i) => row.map((v, j) => v + (i === j ? invOmega[i] : 0)));
+  // b = (τΣ)^-1 Π + Ω^-1 q
+  const b = pi.map((p, i) => {
+    let s = 0;
+    for (let j = 0; j < n; j++) s += invTauCov[i][j] * pi[j];
+    return s + invOmega[i] * histMeans[i];
+  });
+  const Ainv = invertMatrix(A);
+  const muBL = Ainv.map((row) => row.reduce((s, v, j) => s + v * b[j], 0));
+
+  // Mean-variance optimization on posterior: max Sharpe = μ-μ_rf on efficient frontier.
+  // Closed-form tangency portfolio: w ∝ Σ^-1 (μ_BL - rf)
+  const excess = muBL.map((m) => m - rf);
+  const covInv = invertMatrix(cov);
+  const raw = covInv.map((row) => row.reduce((s, v, j) => s + v * excess[j], 0));
+  // Long-only: clip negatives, renormalize
+  const longOnly = raw.map((v) => Math.max(0, v));
+  const sum = longOnly.reduce((s, v) => s + v, 0);
+  return sum > 0 ? longOnly.map((v) => v / sum) : wMkt;
+}
+
+// Matrix inverse via Gauss-Jordan elimination (small dense matrices, n ≤ ~30)
+function invertMatrix(m: number[][]): number[][] {
+  const n = m.length;
+  const aug = m.map((row, i) => [...row, ...Array(n).fill(0).map((_, j) => (i === j ? 1 : 0))]);
+  for (let col = 0; col < n; col++) {
+    let pivot = col;
+    for (let r = col + 1; r < n; r++) if (Math.abs(aug[r][col]) > Math.abs(aug[pivot][col])) pivot = r;
+    if (Math.abs(aug[pivot][col]) < 1e-12) continue;
+    [aug[col], aug[pivot]] = [aug[pivot], aug[col]];
+    const pv = aug[col][col];
+    for (let j = 0; j < 2 * n; j++) aug[col][j] /= pv;
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+      const f = aug[r][col];
+      for (let j = 0; j < 2 * n; j++) aug[r][j] -= f * aug[col][j];
+    }
+  }
+  return aug.map((row) => row.slice(n));
+}
+
+// Compute monthly covariance and mean returns from aligned price history.
+function computeStats(allPrices: PricesMap, tickers: string[]): { cov: number[][]; means: number[] } | null {
+  const { months, lookups } = intersectPeriod(allPrices, tickers);
+  if (months.length < 12) return null;
+  const n = tickers.length;
+  const returns: number[][] = [];
+  for (let i = 1; i < months.length; i++) {
+    const row: number[] = [];
+    for (let j = 0; j < n; j++) {
+      const prev = lookups[j][months[i - 1]];
+      const cur = lookups[j][months[i]];
+      row.push(prev && cur ? cur / prev - 1 : 0);
+    }
+    returns.push(row);
+  }
+  const means = Array(n).fill(0);
+  for (const row of returns) for (let j = 0; j < n; j++) means[j] += row[j];
+  for (let j = 0; j < n; j++) means[j] /= returns.length;
+  const cov = Array(n).fill(0).map(() => Array(n).fill(0));
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      let s = 0;
+      for (const row of returns) s += (row[i] - means[i]) * (row[j] - means[j]);
+      cov[i][j] = s / returns.length;
+    }
+  }
+  return { cov, means };
+}
+
 // Optimizer: searches weight+leverage space to maximize (or minimize) a metric.
 // Uses random sampling + coordinate refinement. Returns best weights and leverage.
 function optimizePortfolio(
@@ -687,6 +820,18 @@ function optimizePortfolio(
 ): { weights: number[]; marginEnabled: boolean; marginLeverage: number } | null {
   const n = base.tickers.length;
   if (n === 0) return null;
+
+  // Closed-form strategies skip the random search
+  if (goal === "riskParity" || goal === "blackLitterman") {
+    const stats = computeStats(allPrices, base.tickers);
+    if (!stats) return null;
+    const w = goal === "riskParity"
+      ? riskParityWeights(stats.cov)
+      : blackLittermanWeights(stats.cov, stats.means, RISK_FREE_RATE);
+    if (onProgress) onProgress(1);
+    return { weights: w.map((v) => Math.round(v * 10000) / 100), marginEnabled: false, marginLeverage: 1 };
+  }
+
   const leverageOptions = [1, 1.5, 2, 2.5, 3];
   const evalCandidate = (
     w: number[],
@@ -714,6 +859,10 @@ function optimizePortfolio(
         break;
       case "minVol":
         metric = -res.volatility; // minimize = maximize negative
+        break;
+      case "calmar":
+        // Calmar = CAGR / Max Drawdown. Penalize zero/high drawdown.
+        metric = res.maxDrawdown > 0.001 ? res.cagr / res.maxDrawdown : -Infinity;
         break;
     }
     return { metric, valid: true };
@@ -826,6 +975,55 @@ const LabelWithHelp = ({ labelKey, helpKey, children }: { labelKey: string; help
     </div>
   );
 };
+
+const OPT_COLORS: Record<string, string> = {
+  emerald: "bg-emerald-900/40 text-emerald-300 border-emerald-700/40 hover:bg-emerald-800/50",
+  sky: "bg-sky-900/40 text-sky-300 border-sky-700/40 hover:bg-sky-800/50",
+  rose: "bg-rose-900/40 text-rose-300 border-rose-700/40 hover:bg-rose-800/50",
+  amber: "bg-amber-900/40 text-amber-300 border-amber-700/40 hover:bg-amber-800/50",
+  violet: "bg-violet-900/40 text-violet-300 border-violet-700/40 hover:bg-violet-800/50",
+  teal: "bg-teal-900/40 text-teal-300 border-teal-700/40 hover:bg-teal-800/50",
+};
+
+const OPT_LABEL_KEY: Record<OptimizeGoal, string> = {
+  cagr: "alloc.optimize.cagr",
+  sharpe: "alloc.optimize.sharpe",
+  minVol: "alloc.optimize.minVol",
+  calmar: "alloc.optimize.calmar",
+  riskParity: "alloc.optimize.riskParity",
+  blackLitterman: "alloc.optimize.blackLitterman",
+};
+
+const OptButton = ({
+  goal,
+  running,
+  progress,
+  onClick,
+  color,
+  t,
+}: {
+  goal: OptimizeGoal;
+  running: OptimizeGoal | null;
+  progress: number;
+  onClick: (g: OptimizeGoal) => void;
+  color: string;
+  t: (k: string) => string;
+}) => (
+  <div className="group relative inline-block">
+    <Button
+      size="xs"
+      variant="secondary"
+      onClick={() => onClick(goal)}
+      disabled={running !== null}
+      className={`${OPT_COLORS[color] ?? OPT_COLORS.emerald} disabled:opacity-50`}
+    >
+      {running === goal ? `${t("alloc.optimize.running")} ${Math.round(progress * 100)}%` : t(OPT_LABEL_KEY[goal])}
+    </Button>
+    <div className="pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-72 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
+      {t(`alloc.optimize.help.${goal}`)}
+    </div>
+  </div>
+);
 
 const MetricCard = ({
   labelKey,
@@ -1934,15 +2132,12 @@ function PortfolioAllocatorInner(): JSX.Element {
                 </Button>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Button size="xs" variant="secondary" onClick={() => runOptimizer("cagr")} disabled={optimizing !== null} className="bg-emerald-900/40 text-emerald-300 border border-emerald-700/40 hover:bg-emerald-800/50 disabled:opacity-50">
-                  {optimizing === "cagr" ? `${t("alloc.optimize.running")} ${Math.round(optProgress * 100)}%` : t("alloc.optimize.cagr")}
-                </Button>
-                <Button size="xs" variant="secondary" onClick={() => runOptimizer("sharpe")} disabled={optimizing !== null} className="bg-sky-900/40 text-sky-300 border border-sky-700/40 hover:bg-sky-800/50 disabled:opacity-50">
-                  {optimizing === "sharpe" ? `${t("alloc.optimize.running")} ${Math.round(optProgress * 100)}%` : t("alloc.optimize.sharpe")}
-                </Button>
-                <Button size="xs" variant="secondary" onClick={() => runOptimizer("minVol")} disabled={optimizing !== null} className="bg-rose-900/40 text-rose-300 border border-rose-700/40 hover:bg-rose-800/50 disabled:opacity-50">
-                  {optimizing === "minVol" ? `${t("alloc.optimize.running")} ${Math.round(optProgress * 100)}%` : t("alloc.optimize.minVol")}
-                </Button>
+                <OptButton goal="cagr" running={optimizing} progress={optProgress} onClick={runOptimizer} color="emerald" t={t} />
+                <OptButton goal="sharpe" running={optimizing} progress={optProgress} onClick={runOptimizer} color="sky" t={t} />
+                <OptButton goal="minVol" running={optimizing} progress={optProgress} onClick={runOptimizer} color="rose" t={t} />
+                <OptButton goal="calmar" running={optimizing} progress={optProgress} onClick={runOptimizer} color="amber" t={t} />
+                <OptButton goal="riskParity" running={optimizing} progress={optProgress} onClick={runOptimizer} color="violet" t={t} />
+                <OptButton goal="blackLitterman" running={optimizing} progress={optProgress} onClick={runOptimizer} color="teal" t={t} />
               </div>
             </Card>
           )}
