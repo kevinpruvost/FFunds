@@ -256,6 +256,10 @@ function nextMonth(m: string): string {
   return `${y}-${String(mo + 1).padStart(2, "0")}`;
 }
 
+function isValidMonth(s: string): boolean {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(s);
+}
+
 function hashColor(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -389,10 +393,11 @@ function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResu
     months = allMonths.slice(cutoffIdx);
     winStart = months[0] ?? startMonth;
   } else if (windowMode === "custom") {
-    const lo = customStart || "";
-    const hi = customEnd || "";
-    months = allMonths.filter((m) => (lo === "" || m >= lo) && (hi === "" || m <= hi));
-    if (months.length === 0) return null;
+    const lo = isValidMonth(customStart) ? customStart : "";
+    const hi = isValidMonth(customEnd) ? customEnd : "";
+    const [a, b] = lo && hi && lo > hi ? [hi, lo] : [lo, hi];
+    const filtered = allMonths.filter((m) => (a === "" || m >= a) && (b === "" || m <= b));
+    months = filtered.length > 0 ? filtered : allMonths;
     winStart = months[0];
     winEnd = months[months.length - 1];
   }
@@ -788,14 +793,17 @@ function computeStats(allPrices: PricesMap, tickers: string[]): { cov: number[][
   const n = tickers.length;
   const returns: number[][] = [];
   for (let i = 1; i < months.length; i++) {
+    let valid = true;
     const row: number[] = [];
     for (let j = 0; j < n; j++) {
       const prev = lookups[j][months[i - 1]];
       const cur = lookups[j][months[i]];
-      row.push(prev && cur ? cur / prev - 1 : 0);
+      if (prev == null || cur == null || prev <= 0) { valid = false; break; }
+      row.push(cur / prev - 1);
     }
-    returns.push(row);
+    if (valid) returns.push(row);
   }
+  if (returns.length < 12) return null;
   const means = Array(n).fill(0);
   for (const row of returns) for (let j = 0; j < n; j++) means[j] += row[j];
   for (let j = 0; j < n; j++) means[j] /= returns.length;
