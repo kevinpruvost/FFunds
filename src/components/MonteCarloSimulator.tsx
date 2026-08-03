@@ -113,19 +113,13 @@ export type PresetKey =
 
 export const PRESETS: Record<PresetKey, { cagr: number; drawdown: number }> = {
   custom: { cagr: 7, drawdown: 30 },
-  golden: { cagr: 8, drawdown: 29 },
-  "golden-2x": { cagr: 11.5, drawdown: 40 },
-  // 3× Golden Ratio with 4% margin loan rate: 3 × 8% − 2 × 4% = 16% gross,
-  // trimmed for volatility drag ≈ 14%. Drawdown roughly tripled, capped ~60%.
-  "golden-3x": { cagr: 14, drawdown: 60 },
+  golden: { cagr: 8.5, drawdown: 13 },
+  "golden-2x": { cagr: 11.5, drawdown: 30 },
+  "golden-3x": { cagr: 13.5, drawdown: 45 },
   sp500: { cagr: 10.76, drawdown: 63 },
   world: { cagr: 8.05, drawdown: 55 },
-  // 2× Nasdaq-100 via leveraged ETF (~0.5% internal financing). QQQ CAGR
-  // ~15%, 2× leveraged with volatility drag ≈ 22%. Drawdown near 80%.
   "nasdaq-2x": { cagr: 22, drawdown: 80 },
-  // All-Weather (Ray Dalio): diversified across equities, long/short bonds,
-  // gold, commodities. Low volatility, ~7.5% CAGR, max drawdown ~25%.
-  "all-weather": { cagr: 7.5, drawdown: 25 },
+  "all-weather": { cagr: 6.2, drawdown: 12 },
 };
 
 const EPSILON = 1e-12;

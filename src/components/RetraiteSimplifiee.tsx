@@ -229,7 +229,8 @@ function fmtCompact(n: number, lang: "fr" | "en"): string {
 
 const GOLDEN_TICKERS: Record<string, number> = {
   "MSCI-WORLD-MOMENTUM": 20,
-  "MSCI-WORLD-SMALL": 19,
+  "MSCI-WORLD-SMALL": 9,
+  "MSCI-WORLD-QUALITY": 10,
   XLU: 10,
   TLT: 14,
   SHY: 6,
