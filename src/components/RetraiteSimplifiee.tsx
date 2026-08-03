@@ -26,6 +26,8 @@ interface WizardState {
   monthly: number;
   inflation: number;
   risk: RiskLevel;
+  desiredRevenue: number;
+  desiredCapital: number;
 }
 
 interface SimResult {
@@ -53,7 +55,7 @@ interface SimResult {
 /* ─────────────────────────── Engine (local, lightweight) ─────────────────────────── */
 
 const EPSILON = 1e-12;
-const PROBE_PATHS = 400;
+const PROBE_PATHS = 10000;
 
 const RISK_TO_PRESET: Record<RiskLevel, PresetKey> = {
   prudent: "all-weather",
@@ -104,6 +106,102 @@ function simulatePath(
   }
   return { yearly, final: value };
 }
+
+const WITHDRAWAL_RATE = 0.04;
+
+// Goals are REAL (today's €). Compare against real projections; the solver
+// grows the real target by inflation and works in nominal FV, using the
+// Ito-corrected drift (mu - 0.5*sigma^2) which approximates the median path
+// of a geometric growth process.
+function computeGoalsAnalysis(s: WizardState, r: SimResult) {
+  const requiredRevenuePortfolio = s.desiredRevenue * 12 / WITHDRAWAL_RATE;
+  const requiredTotal = requiredRevenuePortfolio + s.desiredCapital;
+  const years = Math.max(1, s.retirementAge - s.currentAge);
+  const inflFrac = s.inflation / 100;
+  const inflFactor = inflFrac > 0 ? Math.pow(1 + inflFrac, years) : 1;
+
+  const shortfallMedian = requiredTotal - r.medianReal;
+  const shortfallPessimistic = requiredTotal - r.pessimisticReal;
+  const isAchievableMedian = shortfallMedian <= 0;
+  const isAchievablePessimistic = shortfallPessimistic <= 0;
+
+  const preset = PRESETS[RISK_TO_PRESET[s.risk]];
+  const monthlyReturn = preset.cagr / 100 / 12;
+  const monthlyVol = computeMonthlyVol(preset.drawdown / 100, years);
+  const drift = monthlyReturn - 0.5 * monthlyVol * monthlyVol; // Ito median drift
+  const months = years * 12;
+  const targetNominal = requiredTotal * inflFactor;
+
+  function fvNominal(initial: number, monthly: number, n: number): number {
+    if (n <= 0) return initial;
+    if (Math.abs(drift) < 1e-9) return initial + monthly * n;
+    const g = Math.pow(1 + drift, n);
+    return initial * g + (monthly * (g - 1)) / drift;
+  }
+
+  function solveMonthly(target: number, initial: number, n: number): number {
+    if (n <= 0 || Math.abs(drift) < 1e-9) return Infinity;
+    const g = Math.pow(1 + drift, n);
+    const remaining = target - initial * g;
+    if (remaining <= 0) return 0;
+    return (remaining * drift) / (g - 1);
+  }
+
+  function solveInitial(target: number, monthly: number, n: number): number {
+    if (n <= 0) return target;
+    const g = Math.abs(drift) < 1e-9 ? 1 : Math.pow(1 + drift, n);
+    const fvMonthly = monthly > 0 && Math.abs(drift) >= 1e-9 ? (monthly * (g - 1)) / drift : monthly * n;
+    const remaining = target - fvMonthly;
+    return Math.max(0, remaining / g);
+  }
+
+  function solveYears(target: number, initial: number, monthly: number): number {
+    if (fvNominal(initial, monthly, 80 * 12) < target) return Infinity;
+    let lo = 1, hi = 80;
+    for (let i = 0; i < 100; i++) {
+      const mid = (lo + hi) / 2;
+      if (fvNominal(initial, monthly, mid * 12) >= target) hi = mid;
+      else lo = mid;
+    }
+    return Math.ceil(hi);
+  }
+
+  const adjustments: { type: "monthly" | "initial" | "retirement" | "risk"; value: string }[] = [];
+
+  if (!isAchievableMedian) {
+    const needMonthly = solveMonthly(targetNominal, s.initial, months);
+    if (Number.isFinite(needMonthly) && needMonthly > s.monthly) {
+      adjustments.push({ type: "monthly", value: `${fmt(Math.round(needMonthly), "fr")} €/mois` });
+    }
+    const needInitial = solveInitial(targetNominal, s.monthly, months);
+    if (Number.isFinite(needInitial) && needInitial > s.initial) {
+      adjustments.push({ type: "initial", value: `${fmt(Math.round(needInitial), "fr")} €` });
+    }
+    const needYears = solveYears(targetNominal, s.initial, s.monthly);
+    if (Number.isFinite(needYears) && needYears > years && s.currentAge + needYears <= 95) {
+      adjustments.push({ type: "retirement", value: `${s.currentAge + needYears} ans` });
+    }
+  }
+
+  if (!isAchievablePessimistic && s.risk !== "aggressive") {
+    const order: RiskLevel[] = ["prudent", "balanced", "balanced-plus", "aggressive", "dangerous"];
+    const next = order[order.indexOf(s.risk) + 1];
+    if (next && next !== "dangerous") adjustments.push({ type: "risk", value: next });
+  }
+
+  return {
+    requiredRevenuePortfolio,
+    requiredTotal,
+    shortfallMedian,
+    shortfallPessimistic,
+    isAchievableMedian,
+    isAchievablePessimistic,
+    adjustments,
+    years,
+  };
+}
+
+type GoalsAnalysis = ReturnType<typeof computeGoalsAnalysis>;
 
 function runRetraiteSim(state: WizardState): SimResult {
   const preset = PRESETS[RISK_TO_PRESET[state.risk]];
@@ -313,7 +411,55 @@ function transferToSimulator(s: WizardState): void {
 
 /* ─────────────────────────── Component ─────────────────────────── */
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 7;
+
+function DebouncedInput(props: {
+  value: number;
+  min: number;
+  max: number;
+  isCurrency?: boolean;
+  onCommit: (v: number) => void;
+}): JSX.Element {
+  const { value, min, max, isCurrency, onCommit } = props;
+  const [text, setText] = useState<string>(String(value));
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) setText(String(value));
+  }, [value, focused]);
+
+  const commit = (): void => {
+    const v = parseFloat(text);
+    if (Number.isFinite(v)) {
+      const clamped = Math.max(min, Math.min(max, v));
+      onCommit(clamped);
+      setText(String(clamped));
+    } else {
+      setText(String(value));
+    }
+  };
+
+  const inputCls =
+    "w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 tabular-nums outline-none focus:border-teal-500/50";
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        inputMode="numeric"
+        value={text}
+        onFocus={() => setFocused(true)}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => { setFocused(false); commit(); }}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        className={inputCls}
+      />
+      {isCurrency && (
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-600">€</span>
+      )}
+    </div>
+  );
+}
 
 function RetraiteSimplifieeInner(): JSX.Element {
   const { lang, t } = useI18n();
@@ -326,6 +472,8 @@ function RetraiteSimplifieeInner(): JSX.Element {
     monthly: 300,
     inflation: 2.5,
     risk: "prudent",
+    desiredRevenue: 2000,
+    desiredCapital: 50000,
   });
   const [result, setResult] = useState<SimResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -345,6 +493,8 @@ function RetraiteSimplifieeInner(): JSX.Element {
           monthly: typeof data.state.monthly === "number" ? data.state.monthly : 300,
           inflation: typeof data.state.inflation === "number" ? data.state.inflation : 2.5,
           risk: data.state.risk ?? "prudent",
+          desiredRevenue: typeof data.state.desiredRevenue === "number" ? data.state.desiredRevenue : 2000,
+          desiredCapital: typeof data.state.desiredCapital === "number" ? data.state.desiredCapital : 50000,
         });
       }
       if (typeof data.step === "number" && data.step >= 0 && data.step <= TOTAL_STEPS) {
@@ -368,10 +518,11 @@ function RetraiteSimplifieeInner(): JSX.Element {
     switch (step) {
       case 0: return state.currentAge >= 18 && state.currentAge <= 80;
       case 1: return state.retirementAge > state.currentAge && state.retirementAge <= 95;
-      case 2: return state.initial >= 0;
-      case 3: return state.monthly >= 0;
-      case 4: return state.inflation >= 0 && state.inflation <= 20;
-      case 5: return true;
+      case 2: return state.desiredRevenue >= 0 && state.desiredCapital >= 0;
+      case 3: return state.initial >= 0;
+      case 4: return state.monthly >= 0;
+      case 5: return state.inflation >= 0 && state.inflation <= 20;
+      case 6: return true;
       default: return false;
     }
   }, [step, state]);
@@ -395,12 +546,13 @@ function RetraiteSimplifieeInner(): JSX.Element {
     setResult(null);
   }
 
-  function runSim(): void {
+  function runSim(override?: WizardState): void {
     setRunning(true);
     const version = ++simVersionRef.current;
+    const simState = override ?? state;
     setTimeout(() => {
       if (version !== simVersionRef.current) return;
-      const r = runRetraiteSim(state);
+      const r = runRetraiteSim(simState);
       if (version !== simVersionRef.current) return;
       setResult(r);
       setRunning(false);
@@ -429,6 +581,7 @@ function RetraiteSimplifieeInner(): JSX.Element {
     const growthReal = result.medianReal - result.totalInvestedReal;
     const presetKey = RISK_TO_PRESET[state.risk];
     const showReal = state.inflation > 0;
+    const goals = computeGoalsAnalysis(state, result);
     return (
       <div className="retraite-result grid gap-6 lg:grid-cols-[1fr_1.4fr] fade-slide-in">
         {/* Left column: tips + actions + go further */}
@@ -445,7 +598,7 @@ function RetraiteSimplifieeInner(): JSX.Element {
               {t("ret.btn.restart")}
             </button>
             <button
-              onClick={runSim}
+              onClick={() => runSim()}
               disabled={running}
               className="rounded-lg border border-teal-500/40 bg-teal-500/20 px-4 py-2 text-sm font-medium text-teal-200 transition hover:bg-teal-500/30 disabled:opacity-50"
             >
@@ -473,6 +626,81 @@ function RetraiteSimplifieeInner(): JSX.Element {
           </div>
 
           <p className="text-xs text-slate-600">{t("ret.res.cookie.saved")}</p>
+
+          {/* Goals analysis */}
+          <div className={`rounded-2xl border p-5 ${goals.isAchievableMedian ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
+            <h3 className="text-sm font-semibold text-slate-100">
+              {goals.isAchievableMedian ? t("ret.goals.res.achievable") : t("ret.goals.res.shortfall")}
+            </h3>
+
+            <div className="mt-3 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-400">{t("ret.goals.res.required")}</span>
+                <span className="tabular-nums text-slate-200">{fmt(goals.requiredTotal, lang)} €</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">{t("ret.goals.res.revenuePortfolio")}</span>
+                <span className="tabular-nums text-slate-200">{fmt(goals.requiredRevenuePortfolio, lang)} €</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">{t("ret.goals.res.consumableCapital")}</span>
+                <span className="tabular-nums text-slate-200">{fmt(state.desiredCapital, lang)} €</span>
+              </div>
+              <div className="my-2 h-px bg-slate-800" />
+              <div className="flex justify-between">
+                <span className="text-slate-400">{t("ret.goals.res.medianProjection")}</span>
+                <span className="tabular-nums text-teal-300">{fmt(result.medianReal, lang)} €</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">{t("ret.goals.res.pessimisticProjection")}</span>
+                <span className="tabular-nums text-rose-400">{fmt(result.pessimisticReal, lang)} €</span>
+              </div>
+              {!goals.isAchievableMedian && (
+                <>
+                  <div className="my-2 h-px bg-slate-800" />
+                  <div className="flex justify-between">
+                    <span className="text-amber-300">{t("ret.goals.res.shortfallMedian")}</span>
+                    <span className="tabular-nums text-amber-300">{fmt(goals.shortfallMedian, lang)} €</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-rose-400">{t("ret.goals.res.shortfallPessimistic")}</span>
+                    <span className="tabular-nums text-rose-400">{fmt(goals.shortfallPessimistic, lang)} €</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {goals.adjustments.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-slate-300">{t("ret.goals.res.adjustments.title")}</p>
+                <ul className="mt-2 space-y-1.5">
+                  {goals.adjustments.map((a, i) => {
+                    const label = a.type === "risk"
+                      ? t(`ret.s5.opt.${a.value}.title`)
+                      : a.value;
+                    return (
+                      <li key={i} className="flex items-start gap-2 text-xs text-slate-300">
+                        <span className="mt-0.5 text-teal-400">•</span>
+                        <span>
+                          <span className="font-medium text-slate-200">{t(`ret.goals.res.adjustments.${a.type}`)}</span>
+                          {" : "}
+                          <span className="tabular-nums text-teal-300">{label}</span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            {goals.isAchievableMedian && (
+              <p className="mt-3 text-xs text-emerald-300/80 leading-relaxed">
+                {goals.isAchievablePessimistic
+                  ? t("ret.goals.res.achievablePessimistic")
+                  : t("ret.goals.res.achievableMedianOnly")}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Right column: compact sim results */}
@@ -590,6 +818,106 @@ function RetraiteSimplifieeInner(): JSX.Element {
               </ResponsiveContainer>
             </div>
           </div>
+
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+            <h3 className="text-sm font-semibold text-slate-100">{t("ret.res.adjust.title")}</h3>
+            <p className="mt-1 text-xs text-slate-400">{t("ret.res.adjust.desc")}</p>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-slate-500">{t("ret.res.adjust.strategy")}</label>
+                <select
+                  value={state.risk}
+                  onChange={(e) => { const ns = { ...state, risk: e.target.value as RiskLevel }; setState(ns); runSim(ns); }}
+                  className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-teal-500/50"
+                >
+                  {RISK_OPTIONS.map(({ key }) => (
+                    <option key={key} value={key}>{t(`ret.s5.opt.${key}.title`)}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-slate-500">{t("ret.res.adjust.retirementAge")}</label>
+                <div className="mt-1">
+                  <DebouncedInput
+                    value={state.retirementAge}
+                    min={state.currentAge + 1}
+                    max={95}
+                    onCommit={(v) => { const ns = { ...state, retirementAge: v }; setState(ns); runSim(ns); }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-slate-500">{t("ret.res.adjust.initial")}</label>
+                <div className="mt-1">
+                  <DebouncedInput
+                    value={state.initial}
+                    min={0}
+                    max={100000000}
+                    isCurrency
+                    onCommit={(v) => { const ns = { ...state, initial: v }; setState(ns); runSim(ns); }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-slate-500">{t("ret.res.adjust.monthly")}</label>
+                <div className="mt-1">
+                  <DebouncedInput
+                    value={state.monthly}
+                    min={0}
+                    max={10000000}
+                    isCurrency
+                    onCommit={(v) => { const ns = { ...state, monthly: v }; setState(ns); runSim(ns); }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {state.risk === "dangerous" && (
+              <div className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3">
+                <p className="text-xs font-medium text-rose-300">{t("ret.res.adjust.dangerous.title")}</p>
+                <p className="mt-1 text-xs text-rose-200/80 leading-relaxed">{t("ret.res.adjust.dangerous.desc")}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-teal-500/20 bg-slate-900/60 p-5">
+            <h3 className="text-sm font-semibold text-slate-100">{t("ret.goals.res.adjustments.title")}</h3>
+            <p className="mt-1 text-xs text-slate-400">{t("ret.goals.desc")}</p>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-slate-500">{t("ret.goals.revenue.label")}</label>
+                <div className="mt-1">
+                  <DebouncedInput
+                    value={state.desiredRevenue}
+                    min={0}
+                    max={10000}
+                    isCurrency
+                    onCommit={(v) => { const ns = { ...state, desiredRevenue: v }; setState(ns); runSim(ns); }}
+                  />
+                </div>
+                <p className="mt-1 text-[10px] text-slate-500">{t("ret.goals.revenue.hint")}</p>
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-slate-500">{t("ret.goals.capital.label")}</label>
+                <div className="mt-1">
+                  <DebouncedInput
+                    value={state.desiredCapital}
+                    min={0}
+                    max={500000}
+                    isCurrency
+                    onCommit={(v) => { const ns = { ...state, desiredCapital: v }; setState(ns); runSim(ns); }}
+                  />
+                </div>
+                <p className="mt-1 text-[10px] text-slate-500">{t("ret.goals.capital.hint")}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -653,6 +981,15 @@ function RetraiteSimplifieeInner(): JSX.Element {
         )}
 
         {step === 2 && (
+          <GoalsStep
+            desiredRevenue={state.desiredRevenue}
+            desiredCapital={state.desiredCapital}
+            onChangeRevenue={(v) => setState({ ...state, desiredRevenue: v })}
+            onChangeCapital={(v) => setState({ ...state, desiredCapital: v })}
+          />
+        )}
+
+        {step === 3 && (
           <StepCard
             title={t("ret.s3.title")}
             desc={t("ret.s3.desc")}
@@ -666,7 +1003,7 @@ function RetraiteSimplifieeInner(): JSX.Element {
           />
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <StepCard
             title={t("ret.s4.title")}
             desc={t("ret.s4.desc")}
@@ -680,7 +1017,7 @@ function RetraiteSimplifieeInner(): JSX.Element {
           />
         )}
 
-        {step === 4 && (
+        {step === 5 && (
           <StepCard
             title={t("ret.s5.inflation.title")}
             desc={t("ret.s5.inflation.desc")}
@@ -694,7 +1031,7 @@ function RetraiteSimplifieeInner(): JSX.Element {
           />
         )}
 
-        {step === 5 && (
+        {step === 6 && (
           <RiskStep
             value={state.risk}
             onChange={(r) => setState({ ...state, risk: r })}
@@ -843,6 +1180,99 @@ const RISK_OPTIONS: { key: RiskLevel; selectedClass: string; selectedText: strin
   { key: "aggressive", selectedClass: "border-amber-500/60 bg-amber-500/10", selectedText: "text-amber-300" },
   { key: "dangerous", selectedClass: "border-rose-500/60 bg-rose-500/10", selectedText: "text-rose-300" },
 ];
+
+function GoalsStep(props: {
+  desiredRevenue: number;
+  desiredCapital: number;
+  onChangeRevenue: (v: number) => void;
+  onChangeCapital: (v: number) => void;
+}): JSX.Element {
+  const { t } = useI18n();
+  const { desiredRevenue, desiredCapital, onChangeRevenue, onChangeCapital } = props;
+  const requiredPortfolio = desiredRevenue * 12 / WITHDRAWAL_RATE;
+  const requiredTotal = requiredPortfolio + desiredCapital;
+
+  const inputCls =
+    "w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-50 outline-none transition focus:border-teal-500/50 focus:ring-2 focus:ring-teal-500/20";
+
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-8">
+      <h2 className="text-xl font-bold text-slate-50">{t("ret.goals.title")}</h2>
+      <p className="mt-2 text-sm text-slate-400 leading-relaxed">{t("ret.goals.desc")}</p>
+
+      <div className="mt-4 rounded-xl border border-teal-500/20 bg-teal-500/5 p-4">
+        <p className="text-xs font-medium text-teal-300">{t("ret.goals.rule.title")}</p>
+        <p className="mt-1 text-xs text-slate-300 leading-relaxed">{t("ret.goals.rule.body1")}</p>
+        <p className="mt-1 text-xs text-slate-400 leading-relaxed">{t("ret.goals.rule.body2")}</p>
+      </div>
+
+      <div className="mt-6 space-y-6">
+        <div>
+          <label className="block text-sm font-medium text-slate-300">{t("ret.goals.revenue.label")}</label>
+          <p className="mt-1 text-xs text-slate-500">{t("ret.goals.revenue.hint")}</p>
+          <div className="relative mt-3">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={String(desiredRevenue)}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (Number.isFinite(v) && v >= 0) onChangeRevenue(v);
+              }}
+              className={`${inputCls} text-2xl font-semibold tabular-nums`}
+            />
+            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-500">€/mois</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={10000}
+            step={100}
+            value={desiredRevenue}
+            onChange={(e) => onChangeRevenue(parseFloat(e.target.value))}
+            className="mt-3 w-full accent-teal-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-300">{t("ret.goals.capital.label")}</label>
+          <p className="mt-1 text-xs text-slate-500">{t("ret.goals.capital.hint")}</p>
+          <div className="relative mt-3">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={String(desiredCapital)}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (Number.isFinite(v) && v >= 0) onChangeCapital(v);
+              }}
+              className={`${inputCls} text-2xl font-semibold tabular-nums`}
+            />
+            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-2xl font-semibold text-slate-600">€</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={500000}
+            step={5000}
+            value={desiredCapital}
+            onChange={(e) => onChangeCapital(parseFloat(e.target.value))}
+            className="mt-3 w-full accent-teal-500"
+          />
+        </div>
+
+        <div className="rounded-xl border border-teal-500/30 bg-teal-500/5 p-4 space-y-2">
+          <p className="text-xs font-medium text-teal-200">{t("ret.goals.calc.title")}</p>
+          <div className="text-xs text-slate-400 leading-relaxed">
+            <div>{t("ret.goals.calc.revenueAnnual", { monthly: desiredRevenue, annual: fmt(desiredRevenue * 12, "fr") })}</div>
+            <div className="mt-1">{t("ret.goals.calc.portfolio", { annual: fmt(desiredRevenue * 12, "fr"), portfolio: fmt(requiredPortfolio, "fr") })}</div>
+            <div className="mt-1">{t("ret.goals.calc.total", { portfolio: fmt(requiredPortfolio, "fr"), capital: fmt(desiredCapital, "fr"), total: fmt(requiredTotal, "fr") })}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function RiskStep(props: { value: RiskLevel; onChange: (r: RiskLevel) => void }): JSX.Element {
   const { t } = useI18n();
