@@ -22,6 +22,7 @@
   { "ticker": "MSCI-WORLD-MOMENTUM", "name": "MSCI World Momentum", "class": "indices-monde", "color": "#2dd4bf", "csv": "world_momentum.csv" },
   { "ticker": "MSCI-WORLD-SMALL", "name": "MSCI World Small Cap", "class": "indices-monde", "color": "#a7f3d0", "csv": "world_small_cap.csv" },
   { "ticker": "MSCI-WORLD-QUALITY", "name": "MSCI World Quality", "class": "indices-monde", "color": "#5eead4", "csv": "world_quality.csv" },
+  { "ticker": "MSCI-WORLD-VALUE", "name": "MSCI World Value", "class": "indices-monde", "color": "#99f6e4", "csv": "world_value.csv" },
   { "ticker": "^GSPC", "name": "S&P 500 (index brut)",   "class": "actions-us",        "color": "#93c5fd" },
   { "ticker": "^TNX", "name": "10y Treasury Yield",     "class": "obligations",       "color": "#a5b4fc" },
   { "ticker": "^VIX", "name": "VIX",                     "class": "alternatif",       "color": "#fca5a5" },
