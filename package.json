@@ -9,6 +9,7 @@
     "check": "NODE_OPTIONS='--max-old-space-size=4096' astro check",
     "preview": "astro preview",
     "fetch-data": "node scripts/fetch-prices.mjs",
+    "fetch-msci": "node scripts/refresh-msci.mjs",
     "prebuild": "node scripts/fetch-prices.mjs"
   },
   "dependencies": {

@@ -17,7 +17,7 @@
   { "ticker": "GLD",  "name": "Or",                      "class": "matieres",         "color": "#fde047" },
   { "ticker": "BTC-USD", "name": "Bitcoin",              "class": "crypto",           "color": "#fb923c" },
   { "ticker": "DBMF", "name": "Managed Futures",         "class": "alternatif",       "color": "#94a3b8" },
-  { "ticker": "KMLM", "name": "KFA MLM Index (1988-)",    "class": "alternatif",       "color": "#9ca3af", "csv": "kmlm.csv" },
+  { "ticker": "KMLM", "name": "KMLM (hist. 1988- + ETF)", "class": "alternatif",       "color": "#9ca3af", "csv": "kmlm.csv" },
   { "ticker": "MSCI-WORLD", "name": "MSCI World",        "class": "indices-monde",    "color": "#5eead4", "csv": "msci_world.csv" },
   { "ticker": "MSCI-WORLD-MOMENTUM", "name": "MSCI World Momentum", "class": "indices-monde", "color": "#2dd4bf", "csv": "world_momentum.csv" },
   { "ticker": "MSCI-WORLD-SMALL", "name": "MSCI World Small Cap", "class": "indices-monde", "color": "#a7f3d0", "csv": "world_small_cap.csv" },
