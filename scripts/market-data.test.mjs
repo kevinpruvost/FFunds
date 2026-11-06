@@ -6,14 +6,14 @@ const read = name => readFileSync(new URL(`../src/data/${name}`, import.meta.url
 const prices = JSON.parse(read("prices.json"));
 const config = JSON.parse(read("tickers.config.json"));
 
-test("all configured series cover August and September 2026 with unique valid months", () => {
+test("all configured series cover October and November 2026 with unique valid months", () => {
   assert.deepEqual(Object.keys(prices).sort(), config.map(entry => entry.ticker).sort());
   for (const [ticker, series] of Object.entries(prices)) {
     const dates = series.monthly.map(row => row.date);
     assert.deepEqual(dates, [...new Set(dates)].sort(), ticker);
     assert.equal(series.startDate, dates[0], ticker);
     assert.equal(series.endDate, dates.at(-1), ticker);
-    for (const month of ["2026-08", "2026-09"]) assert.ok(dates.includes(month), ticker);
+    for (const month of ["2026-10", "2026-11"]) assert.ok(dates.includes(month), ticker);
     for (const row of series.monthly) {
       assert.match(row.date, /^\d{4}-(0[1-9]|1[0-2])$/);
       assert.ok(Number.isFinite(row.close) && row.close > 0, ticker);
@@ -36,7 +36,8 @@ test("baked CSV series equal the last observation of each month", () => {
 test("KMLM additions preserve the ETF-linked scale and total-return ratios", () => {
   const anchor = 166818.381;
   const anchorPrice = 29.309999465942383;
-  const observed = [["2026-08-31", 29.899999618530273], ["2026-09-24", 31.06999969482422]];
+  const observed = [["2026-08-31", 29.899999618530273], ["2026-09-30", 31.09000015258789],
+    ["2026-10-30", 30.690000534057617], ["2026-11-06", 29.209999084472656]];
   const rows = read("kmlm.csv").trimEnd().split(/\r?\n/).map(line => line.split(","));
   let previous = anchorPrice;
   for (const [date, adjustedClose] of observed) {

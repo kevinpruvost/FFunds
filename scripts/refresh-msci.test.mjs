@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { monthlyLevels, mergeCsv } from "./refresh-msci.mjs";
+import { monthlyLevels, mergeCsv, newCsv } from "./refresh-msci.mjs";
 
 const payload = rows => ({ msci_index_code: "990100", index_variant_type: "NETR",
   ISO_currency_symbol: "USD", indexes: { INDEX_LEVELS: rows } });
@@ -51,4 +51,11 @@ test("rejects missing overlap, conflicting levels, gaps, and regressions", () =>
     [{ date: "2026-07-31", close: 100 }, { date: "2026-09-24", close: 103 }]]) {
     assert.throws(() => mergeCsv(csv, rows));
   }
+});
+
+test("creates a new series from its first official level and rejects gaps", () => {
+  const rows = [{ date: "2000-12-29", close: 93 }, { date: "2001-01-31", close: 87 }];
+  assert.equal(newCsv("MSCI World Consumer Staples Index", rows),
+    "Index Level:,Net\nCurrency:,USD\n\nDate,MSCI World Consumer Staples Index\n2000-12-29,93,,,\n2001-01-31,87,,,\n");
+  assert.throws(() => newCsv("x", [rows[0], { date: "2001-03-30", close: 1 }]));
 });

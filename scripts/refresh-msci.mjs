@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 // Refresh the official Net/USD index CSVs, including the current partial month.
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 
 const DATA = new URL("../src/data/", import.meta.url);
 export const INDICES = {
-  "msci_world.csv": "990100",
-  "world_momentum.csv": "703755",
-  "world_small_cap.csv": "106230",
-  "world_quality.csv": "702787",
-  "world_value.csv": "105868",
+  "msci_world.csv": { code: "990100", name: "MSCI World Index" },
+  "world_momentum.csv": { code: "703755", name: "MSCI World Momentum Index" },
+  "world_small_cap.csv": { code: "106230", name: "MSCI World Small Cap Index" },
+  "world_quality.csv": { code: "702787", name: "MSCI World Quality Index" },
+  "world_value.csv": { code: "105868", name: "MSCI World Value Index" },
+  "world_consumer_staples.csv": { code: "106800", name: "MSCI World Consumer Staples Index" },
+  "world_consumer_discretionary.csv": { code: "106799", name: "MSCI World Consumer Discretionary Index" },
 };
 
 export function monthlyLevels(payload, indexCode) {
@@ -67,24 +69,33 @@ export function mergeCsv(csv, monthly) {
   return [...lines, ...additions.map(row => `${row.date},${row.close},,,`)].join(newline) + newline;
 }
 
+// New series start from their first official level, with the same
+// 4-line header as MSCI exports and the same gap checks as later refreshes.
+export function newCsv(name, monthly) {
+  const [first] = monthly;
+  return mergeCsv(`Index Level:,Net\nCurrency:,USD\n\nDate,${name}\n${first.date},${first.close},,,\n`, monthly);
+}
+
 async function main() {
   const endDate = new Date().toISOString().slice(0, 10).replaceAll("-", "");
   const updates = [];
-  for (const [filename, code] of Object.entries(INDICES)) {
+  for (const [filename, { code, name }] of Object.entries(INDICES)) {
     const path = new URL(filename, DATA);
-    const csv = readFileSync(path, "utf8");
-    const lastDate = csv.trimEnd().split(/\r?\n/).at(-1).split(",")[0];
+    const csv = existsSync(path) ? readFileSync(path, "utf8") : null;
+    // MSCI serves no calculation date before 1997-01-01.
+    const startDate = csv
+      ? csv.trimEnd().split(/\r?\n/).at(-1).split(",")[0].slice(0, 7).replace("-", "") + "01"
+      : "19970101";
     const url = new URL("https://app2.msci.com/products/service/index/indexmaster/getLevelDataForGraph");
     url.search = new URLSearchParams({
       currency_symbol: "USD", index_variant: "NETR", data_frequency: "DAILY",
-      start_date: lastDate.slice(0, 7).replace("-", "") + "01",
-      end_date: endDate, index_codes: code,
+      start_date: startDate, end_date: endDate, index_codes: code,
     }).toString();
     const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
     if (!response.ok) throw new Error(`${filename}: HTTP ${response.status}`);
     const monthly = monthlyLevels(await response.json(), code);
     try {
-      updates.push([path, mergeCsv(csv, monthly)]);
+      updates.push([path, csv ? mergeCsv(csv, monthly) : newCsv(name, monthly)]);
     } catch (error) {
       throw new Error(`${filename}: ${error.message}`);
     }

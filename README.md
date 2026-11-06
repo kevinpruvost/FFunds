@@ -19,7 +19,7 @@ Les données historiques mensuelles des actifs sont stockées dans `src/data/pri
 
 ### Indices MSCI et fichiers locaux
 
-- `npm run fetch-msci` met à jour les cinq CSV MSCI depuis la source officielle en **Net / USD**. Puis `npm run fetch-data` régénère `prices.json` avec ces CSV et les cours Yahoo.
+- `npm run fetch-msci` met à jour les sept CSV MSCI (World, Momentum, Small Cap, Quality, Value, Consumer Staples, Consumer Discretionary) depuis la source officielle en **Net / USD**. Un CSV listé dans `INDICES` mais absent du dépôt est créé depuis le premier niveau disponible. Puis `npm run fetch-data` régénère `prices.json` avec ces CSV et les cours Yahoo.
 - La fréquence quotidienne permet de prendre la dernière observation de chaque mois, y compris le mois en cours **non terminé**. La date exacte reste dans le CSV ; la clé dans `prices.json` est `YYYY-MM`.
 - L'historique existant est conservé, avec contrôle du chevauchement. Momentum conserve sa base 100 au 31/01/1997, différente des niveaux bruts de l'API.
 - `npm run fetch-msci` est explicite : `fetch-data` et `prebuild` continuent à lire les CSV locaux, sans rafraîchir MSCI automatiquement.
