@@ -211,6 +211,27 @@ const PRESETS: Record<string, Record<string, number>> = {
     GLD: 11,
     "BTC-USD": 5,
   },
+  "golden-v3": {
+    "MSCI-WORLD-MOMENTUM": 10,
+    "MSCI-WORLD-SMALL": 10,
+    "MSCI-WORLD-QUALITY": 10,
+    "MSCI-WORLD-CONS-STAPLES": 10,
+    XLU: 10,
+    TLT: 16,
+    KMLM: 16,
+    GLD: 18,
+  },
+  "golden-v3-btc": {
+    "MSCI-WORLD-MOMENTUM": 10,
+    "MSCI-WORLD-SMALL": 10,
+    "MSCI-WORLD-QUALITY": 10,
+    "MSCI-WORLD-CONS-STAPLES": 10,
+    XLU: 10,
+    TLT: 16,
+    KMLM: 16,
+    GLD: 13,
+    "BTC-USD": 5,
+  },
   "60/40": {
     SPY: 60,
     SHY: 40,
@@ -2255,6 +2276,8 @@ function PortfolioAllocatorInner(): JSX.Element {
                         <SelectItem value="">—</SelectItem>
                         <SelectItem value="golden">{t("alloc.preset.golden")}</SelectItem>
                         <SelectItem value="golden-v2">{t("alloc.preset.goldenV2")}</SelectItem>
+                        <SelectItem value="golden-v3">{t("alloc.preset.goldenV3")}</SelectItem>
+                        <SelectItem value="golden-v3-btc">{t("alloc.preset.goldenV3Btc")}</SelectItem>
                         <SelectItem value="60/40">{t("alloc.preset.6040")}</SelectItem>
                         <SelectItem value="all-weather">{t("alloc.preset.allWeather")}</SelectItem>
                         <SelectItem value="equal-weight">{t("alloc.preset.equalWeight")}</SelectItem>
