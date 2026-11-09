@@ -2258,7 +2258,6 @@ function PortfolioAllocatorInner(): JSX.Element {
                     <tbody>
                       {(() => {
                         const rows: Array<{ key: string; label: string; render: (r: BacktestResult | null) => React.ReactNode }> = [
-                          { key: "period", label: t("alloc.compare.period"), render: (r) => r ? `${r.startMonth} – ${r.endMonth}` : "—" },
                           { key: "finalValue", label: t("alloc.metrics.finalValue"), render: (r) => r ? formatEUR(r.finalValue, lang) : "—" },
                           { key: "totalInvested", label: t("alloc.metrics.totalInvested"), render: (r) => r ? formatEUR(r.totalInvested, lang) : "—" },
                           { key: "cagr", label: t("alloc.metrics.cagr"), render: (r) => r ? formatPct(r.cagr * 100, 2, lang) : "—" },
