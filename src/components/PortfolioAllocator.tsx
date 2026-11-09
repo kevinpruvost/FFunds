@@ -35,6 +35,18 @@ import {
   YAxis,
 } from "recharts";
 
+import {
+  RISK_FREE_RATE,
+  getComparisonPeriod,
+  selectBacktestMonths,
+  intersectPeriod as getIntersectedPeriod,
+  runBacktest as simulatePortfolio,
+  runComparison,
+  type PricesMap,
+  type SimulationInput,
+  type BacktestResult,
+} from "../lib/portfolioBacktest";
+
 import pricesData from "../data/prices.json";
 import tickersConfig from "../data/tickers.config.json";
 import { I18nProvider, useI18n } from "../i18n/I18nProvider";
@@ -49,14 +61,6 @@ interface TickerMeta {
   color: string;
 }
 
-interface AssetHistory {
-  startDate: string;
-  endDate: string;
-  monthly: { date: string; close: number }[];
-}
-
-type PricesMap = Record<string, AssetHistory>;
-
 interface CustomTicker {
   ticker: string;
   name: string;
@@ -65,77 +69,6 @@ interface CustomTicker {
   startDate: string;
   endDate: string;
   monthly: { date: string; close: number }[];
-}
-
-interface SimulationInput {
-  tickers: string[];
-  weights: number[];
-  initialInvestment: number;
-  monthlyContribution: number;
-  rebalance: "none" | "monthly" | "quarterly" | "annual" | "threshold5" | "bands5_25";
-  // Margin loan (optional). When enabled, the portfolio is leveraged at start
-  // by `marginLeverage` (e.g. 1.5 = 150 % gross exposure) and an annual
-  // `marginLoanRate` interest is charged on the loan balance, either monthly
-  // or yearly depending on `marginInterestFreq`.
-  marginEnabled: boolean;
-  marginLeverage: number;
-  marginLoanRate: number;
-  marginInterestFreq: "monthly" | "yearly";
-  // Re-leverage: when true, each month the loan is adjusted to restore the
-  // target leverage on the current equity. Direction is controlled by
-  // marginRebalanceMode.
-  marginRebalance: boolean;
-  marginRebalanceMode: "gains-only" | "bidirectional";
-  marginMaintenancePct: number;
-  inflationPct: number;
-  // Time window filter. "all" = full available data (default, no limit),
-  // "lastN" = keep only the last N years of the available period,
-  // "custom" = explicit [customStart, customEnd] month range (YYYY-MM).
-  windowMode: "all" | "lastN" | "custom";
-  yearsBack: number;
-  customStart: string; // "" = no lower bound
-  customEnd: string;   // "" = no upper bound
-  // Stop monthly contributions after this many years (0 = never stop).
-  contribStopYears: number;
-}
-
-interface BacktestResult {
-  startMonth: string;
-  endMonth: string;
-  limitingTicker: string;
-  limitingTickerName: string;
-  limitingEndTicker: string;
-  limitingEndTickerName: string;
-  months: string[];
-  // Gross asset value held (equity + loan when margin is on).
-  portfolioValue: number[];
-  // Net equity = portfolioValue - loanAmount. Equal to portfolioValue when
-  // margin is disabled.
-  equityValue: number[];
-  invested: number[];
-  drawdown: number[];
-  // Real (inflation-adjusted) equity values, same length as equityValue.
-  // Each entry i is discounted from its month index: real_i = equity_i / (1+infl)^(i/12).
-  equityValueReal: number[];
-  investedReal: number[];
-  finalValueReal: number;
-  totalInvestedReal: number;
-  inflationPct: number;
-  realCagr: number;
-  finalValue: number;
-  totalInvested: number;
-  cagr: number;
-  volatility: number;
-  maxDrawdown: number;
-  sharpe: number;
-  sortino: number;
-  marginEnabled: boolean;
-  marginLeverage: number;
-  loanAmount: number;
-  loanAmountSeries: number[];
-  interestPaidSeries: number[];
-  totalInterestPaid: number;
-  liquidationMonth: string | null;
 }
 
 interface Portfolio {
@@ -167,6 +100,7 @@ interface GlobalSimState {
   marginRebalance: boolean;
   marginRebalanceMode: "gains-only" | "bidirectional";
   marginMaintenancePct: number;
+  marginLiquidationBufferPct: number;
 }
 
 /* ─────────────────────────── Constants ─────────────────────────── */
@@ -174,7 +108,6 @@ interface GlobalSimState {
 const PRICES: PricesMap = pricesData as PricesMap;
 const TICKERS: TickerMeta[] = tickersConfig as TickerMeta[];
 
-const RISK_FREE_RATE = 0.02;
 
 const CUSTOM_COLORS = [
   "#f87171", "#fb923c", "#facc15", "#4ade80", "#22d3ee",
@@ -316,16 +249,6 @@ function formatPct(n: number, digits = 1, lang: string = "fr"): string {
   return `${n.toFixed(digits).replace(".", sep)} %`;
 }
 
-function nextMonth(m: string): string {
-  const [y, mo] = m.split("-").map(Number);
-  if (mo === 12) return `${y + 1}-01`;
-  return `${y}-${String(mo + 1).padStart(2, "0")}`;
-}
-
-function isValidMonth(s: string): boolean {
-  return /^\d{4}-(0[1-9]|1[0-2])$/.test(s);
-}
-
 function hashColor(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -355,357 +278,11 @@ function readCookie(name: string): string | null {
 
 /* ─────────────────────────── Engine ─────────────────────────── */
 
-function intersectPeriod(prices: PricesMap, tickers: string[]) {
-  if (tickers.length === 0) {
-    return {
-      startMonth: "",
-      endMonth: "",
-      limitingTicker: "",
-      limitingTickerName: "",
-      limitingEndTicker: "",
-      limitingEndTickerName: "",
-      months: [] as string[],
-      lookups: [] as Record<string, number>[],
-    };
-  }
-
-  let maxStart = "";
-  let minEnd = "";
-  let limitingTicker = "";
-  let limitingEndTicker = "";
-
-  for (const t of tickers) {
-    if (t === "CASH") continue;
-    const hist = prices[t];
-    if (!hist) continue;
-    if (maxStart === "" || hist.startDate > maxStart) {
-      maxStart = hist.startDate;
-      limitingTicker = t;
-    }
-    if (minEnd === "" || hist.endDate < minEnd) {
-      minEnd = hist.endDate;
-      limitingEndTicker = t;
-    }
-  }
-
-  const limitingTickerName =
-    TICKERS.find((t) => t.ticker === limitingTicker)?.name ??
-    limitingTicker;
-  const limitingEndTickerName =
-    TICKERS.find((t) => t.ticker === limitingEndTicker)?.name ??
-    limitingEndTicker;
-
-  const months: string[] = [];
-  let cur = maxStart;
-  while (cur <= minEnd) {
-    months.push(cur);
-    cur = nextMonth(cur);
-  }
-
-  const lookups = tickers.map((t) => {
-    if (t === "CASH") {
-      return new Proxy({} as Record<string, number>, {
-        get: () => 1,
-        has: () => true,
-      });
-    }
-    const map: Record<string, number> = {};
-    const hist = prices[t];
-    if (hist) {
-      for (const pt of hist.monthly) {
-        map[pt.date] = pt.close;
-      }
-    }
-    return map;
-  });
-
-  return { startMonth: maxStart, endMonth: minEnd, limitingTicker, limitingTickerName, limitingEndTicker, limitingEndTickerName, months, lookups };
-}
-
-function runBacktest(input: SimulationInput, allPrices: PricesMap): BacktestResult | null {
-  const {
-    tickers,
-    weights,
-    initialInvestment,
-    monthlyContribution,
-    rebalance,
-    marginEnabled,
-    marginLeverage,
-    marginLoanRate,
-    marginInterestFreq,
-    marginRebalance,
-    marginRebalanceMode,
-    marginMaintenancePct,
-    inflationPct,
-    windowMode,
-    yearsBack,
-    customStart,
-    customEnd,
-    contribStopYears,
-  } = input;
-  if (tickers.length === 0) return null;
-
-  const { startMonth, endMonth, limitingTicker, limitingTickerName, limitingEndTicker, limitingEndTickerName, months: allMonths, lookups } = intersectPeriod(allPrices, tickers);
-  if (allMonths.length === 0) return null;
-
-  // Apply time window filter on top of the ticker-intersected period.
-  // "all": no filter. "lastN": keep final N*12 months. "custom": clamp to
-  // [customStart, customEnd] (empty string = no bound on that side).
-  let months = allMonths;
-  let winStart = startMonth;
-  let winEnd = endMonth;
-  if (windowMode === "lastN" && yearsBack > 0) {
-    const cutoffIdx = Math.max(0, allMonths.length - yearsBack * 12);
-    months = allMonths.slice(cutoffIdx);
-    winStart = months[0] ?? startMonth;
-  } else if (windowMode === "custom") {
-    const lo = isValidMonth(customStart) ? customStart : "";
-    const hi = isValidMonth(customEnd) ? customEnd : "";
-    const [a, b] = lo && hi && lo > hi ? [hi, lo] : [lo, hi];
-    const filtered = allMonths.filter((m) => (a === "" || m >= a) && (b === "" || m <= b));
-    months = filtered.length > 0 ? filtered : allMonths;
-    winStart = months[0];
-    winEnd = months[months.length - 1];
-  }
-
-  const n = tickers.length;
-  const totalWeight = weights.reduce((s, w) => s + w, 0);
-  // Auto-normalize: proportions matter, absolute sum does not
-  const normDivisor = totalWeight > 0 ? totalWeight : 100;
-  const wFrac = weights.map((w) => w / normDivisor);
-
-  // Margin loan setup. Leverage L means total exposure = L * equity, so the
-  // loan = (L - 1) * initialInvestment. Loan balance is held flat through the
-  // simulation unless re-leverage is enabled; interest is deducted from
-  // assets (reducing equity).
-  const safeLeverage = marginEnabled ? Math.max(1, marginLeverage) : 1;
-  let loanAmount = marginEnabled ? initialInvestment * (safeLeverage - 1) : 0;
-  const initialLoan = loanAmount;
-  const startingAssets = initialInvestment * safeLeverage;
-
-  const assetValues: number[] = wFrac.map((wf) => startingAssets * wf);
-  let totalInvested = initialInvestment;
-  let peak = startingAssets - loanAmount;
-  let totalInterestPaid = 0;
-  let liquidationMonth: string | null = null;
-
-  const portfolioValue: number[] = [startingAssets];
-  const equityValue: number[] = [startingAssets - loanAmount];
-  const loanAmountSeries: number[] = [loanAmount];
-  const invested: number[] = [initialInvestment];
-  const drawdown: number[] = [0];
-  const interestPaidSeries: number[] = [0];
-
-  const monthlyReturns: number[] = [];
-
-  for (let m = 1; m < months.length; m++) {
-    const monthLabel = months[m];
-    const prevMonthLabel = months[m - 1];
-
-    for (let i = 0; i < n; i++) {
-      const prevClose = lookups[i][prevMonthLabel];
-      const curClose = lookups[i][monthLabel];
-      if (prevClose == null || curClose == null) {
-        continue;
-      }
-      const ret = curClose / prevClose;
-      assetValues[i] *= ret;
-    }
-
-    // Margin interest. Charged on the outstanding loan balance.
-    // Monthly: every month at rate/12. Yearly: on each 12-month anniversary.
-    if (marginEnabled && loanAmount > 0) {
-      let interest = 0;
-      if (marginInterestFreq === "monthly") {
-        interest = loanAmount * (marginLoanRate / 12);
-      } else if (marginInterestFreq === "yearly" && m % 12 === 0) {
-        interest = loanAmount * marginLoanRate;
-      }
-      if (interest > 0) {
-        totalInterestPaid += interest;
-        const beforeInterest = assetValues.reduce((s, v) => s + v, 0);
-        if (beforeInterest > 0) {
-          const scale = Math.max(0, (beforeInterest - interest) / beforeInterest);
-          for (let i = 0; i < n; i++) assetValues[i] *= scale;
-        }
-      }
-      interestPaidSeries.push(interest);
-    } else {
-      interestPaidSeries.push(0);
-    }
-
-    const valueAfterMarket = assetValues.reduce((s, v) => s + v, 0);
-    const equityAfter = valueAfterMarket - loanAmount;
-    const equityPrev = equityValue[m - 1];
-    const marketReturn = equityPrev > 0 ? (equityAfter - equityPrev) / equityPrev : 0;
-    monthlyReturns.push(marketReturn);
-
-    // Margin call / liquidation: equity falls below maintenance margin.
-    // Broker sells everything, equity is 0 for the rest of the run.
-    // Maintenance threshold: maintenancePct of total asset value. If equity < threshold,
-    // liquidation triggers.
-    const maintThreshold = marginEnabled ? marginMaintenancePct / 100 * valueAfterMarket : 0;
-    if (marginEnabled && equityAfter <= maintThreshold && liquidationMonth === null) {
-      liquidationMonth = monthLabel;
-      loanAmount = 0;
-      for (let k = m; k < months.length; k++) {
-        portfolioValue.push(0);
-        equityValue.push(0);
-        loanAmountSeries.push(0);
-        invested.push(totalInvested);
-        drawdown.push(1);
-        interestPaidSeries.push(0);
-      }
-      break;
-    }
-
-    const contribution = contribStopYears > 0 && m > contribStopYears * 12 ? 0 : monthlyContribution;
-    for (let i = 0; i < n; i++) {
-      assetValues[i] += contribution * wFrac[i];
-    }
-    totalInvested += contribution;
-
-    const totalValue = assetValues.reduce((s, v) => s + v, 0);
-
-    let shouldRebalance = false;
-    if (rebalance === "monthly") {
-      shouldRebalance = true;
-    } else if (rebalance === "quarterly" && m % 3 === 0) {
-      shouldRebalance = true;
-    } else if (rebalance === "annual" && m % 12 === 0) {
-      shouldRebalance = true;
-    } else if (rebalance === "threshold5") {
-      for (let i = 0; i < n; i++) {
-        const target = wFrac[i];
-        const actual = totalValue > 0 ? assetValues[i] / totalValue : 0;
-        if (target > 0 && Math.abs(actual - target) > 0.05) {
-          shouldRebalance = true;
-          break;
-        }
-      }
-    } else if (rebalance === "bands5_25") {
-      for (let i = 0; i < n; i++) {
-        const target = wFrac[i];
-        const actual = totalValue > 0 ? assetValues[i] / totalValue : 0;
-        const absDev = Math.abs(actual - target);
-        const relDev = target > 0 ? absDev / target : 0;
-        if (absDev > 0.05 || relDev > 0.25) {
-          shouldRebalance = true;
-          break;
-        }
-      }
-    }
-
-    if (shouldRebalance) {
-      for (let i = 0; i < n; i++) {
-        assetValues[i] = totalValue * wFrac[i];
-      }
-    }
-
-    const postRebalanceTotal = assetValues.reduce((s, v) => s + v, 0);
-
-    // Re-leverage: restore target leverage L on the current equity.
-    // target_loan = (L - 1) * equity. delta = target - current.
-    // gains-only: borrow more when delta > 0, ignore when delta < 0.
-    // bidirectional: also repay (sell assets, shrink loan) when delta < 0.
-    if (marginEnabled && marginRebalance && safeLeverage > 1) {
-      const equity = postRebalanceTotal - loanAmount;
-      if (equity > 0) {
-        const targetLoan = (safeLeverage - 1) * equity;
-        const delta = targetLoan - loanAmount;
-        const shouldApply = marginRebalanceMode === "bidirectional" || delta > 0;
-        if (shouldApply && Math.abs(delta) > 0.01) {
-          if (delta > 0) {
-            for (let i = 0; i < n; i++) assetValues[i] += delta * wFrac[i];
-            loanAmount += delta;
-          } else {
-            const repay = Math.min(-delta, postRebalanceTotal, loanAmount);
-            if (repay > 0) {
-              const scale = postRebalanceTotal > 0 ? (postRebalanceTotal - repay) / postRebalanceTotal : 0;
-              for (let i = 0; i < n; i++) assetValues[i] *= scale;
-              loanAmount -= repay;
-            }
-          }
-        }
-      }
-    }
-
-    const finalTotal = assetValues.reduce((s, v) => s + v, 0);
-    const postEquity = finalTotal - loanAmount;
-    portfolioValue.push(finalTotal);
-    equityValue.push(postEquity);
-    loanAmountSeries.push(loanAmount);
-    invested.push(totalInvested);
-    peak = Math.max(peak, postEquity);
-    const dd = peak > 0 ? (peak - postEquity) / peak : 0;
-    drawdown.push(dd);
-  }
-
-  const finalValue = equityValue[equityValue.length - 1];
-  const nMonths = months.length - 1;
-
-  let cumProduct = 1;
-  for (const r of monthlyReturns) cumProduct *= 1 + r;
-  const cagr = nMonths > 0 ? Math.pow(cumProduct, 12 / nMonths) - 1 : 0;
-
-  const meanMonthly = monthlyReturns.reduce((s, r) => s + r, 0) / Math.max(monthlyReturns.length, 1);
-  const variance = monthlyReturns.reduce((s, r) => s + Math.pow(r - meanMonthly, 2), 0) / Math.max(monthlyReturns.length, 1);
-  const monthlyStd = Math.sqrt(variance);
-  const volatility = monthlyStd * Math.sqrt(12);
-
-  const maxDrawdown = Math.max(...drawdown);
-
-  const rfMonthly = RISK_FREE_RATE / 12;
-  const sharpe = monthlyStd > 0 ? (meanMonthly - rfMonthly) / monthlyStd * Math.sqrt(12) : 0;
-
-  const downsideReturns = monthlyReturns.filter((r) => r < rfMonthly);
-  const downsideMean = downsideReturns.reduce((s, r) => s + r, 0) / Math.max(downsideReturns.length, 1);
-  const downsideVariance = downsideReturns.reduce((s, r) => s + Math.pow(r - downsideMean, 2), 0) / Math.max(downsideReturns.length, 1);
-  const downsideStd = Math.sqrt(downsideVariance);
-  const sortino = downsideStd > 0 ? (meanMonthly - rfMonthly) / downsideStd * Math.sqrt(12) : 0;
-
-  const inflFrac = inflationPct / 100;
-  const equityValueReal = equityValue.map((v, i) => inflFrac > 0 ? v / Math.pow(1 + inflFrac, i / 12) : v);
-  const investedReal = invested.map((v, i) => inflFrac > 0 ? v / Math.pow(1 + inflFrac, i / 12) : v);
-  const finalValueReal = equityValueReal[equityValueReal.length - 1] ?? 0;
-  const totalInvestedReal = investedReal[investedReal.length - 1] ?? 0;
-  // Real CAGR = inflation-adjusted compound growth rate.
-  const realCagr = inflFrac > 0 ? (1 + cagr) / (1 + inflFrac) - 1 : cagr;
-
-  return {
-    startMonth: winStart,
-    endMonth: winEnd,
-    limitingTicker,
-    limitingTickerName,
-    limitingEndTicker,
-    limitingEndTickerName,
-    months,
-    portfolioValue,
-    equityValue,
-    invested,
-    drawdown,
-    equityValueReal,
-    investedReal,
-    finalValueReal,
-    totalInvestedReal,
-    inflationPct,
-    realCagr,
-    finalValue,
-    totalInvested,
-    cagr,
-    volatility,
-    maxDrawdown,
-    sharpe,
-    sortino,
-    marginEnabled,
-    marginLeverage: safeLeverage,
-    loanAmount: initialLoan,
-    loanAmountSeries,
-    interestPaidSeries,
-    totalInterestPaid,
-    liquidationMonth,
-  };
-}
+const TICKER_NAMES = Object.fromEntries(TICKERS.map(ticker => [ticker.ticker, ticker.name]));
+const intersectPeriod = (prices: PricesMap, tickers: string[]) =>
+  getIntersectedPeriod(prices, tickers, TICKER_NAMES);
+const runBacktest = (input: SimulationInput, prices: PricesMap) =>
+  simulatePortfolio(input, prices, TICKER_NAMES);
 
 /* ─────────────────────────── Component ─────────────────────────── */
 
@@ -853,8 +430,10 @@ function invertMatrix(m: number[][]): number[][] {
 }
 
 // Compute monthly covariance and mean returns from aligned price history.
-function computeStats(allPrices: PricesMap, tickers: string[]): { cov: number[][]; means: number[] } | null {
-  const { months, lookups } = intersectPeriod(allPrices, tickers);
+function computeStats(allPrices: PricesMap, input: SimulationInput): { cov: number[][]; means: number[] } | null {
+  const tickers = input.tickers;
+  const { months: allMonths, lookups } = intersectPeriod(allPrices, tickers);
+  const months = selectBacktestMonths(allMonths, input);
   if (months.length < 12) return null;
   const n = tickers.length;
   const returns: number[][] = [];
@@ -897,7 +476,7 @@ function optimizePortfolio(
 
   // Closed-form strategies skip the random search
   if (goal === "riskParity" || goal === "blackLitterman") {
-    const stats = computeStats(allPrices, base.tickers);
+    const stats = computeStats(allPrices, base);
     if (!stats) return null;
     const w = goal === "riskParity"
       ? riskParityWeights(stats.cov)
@@ -1173,6 +752,7 @@ function PortfolioAllocatorInner(): JSX.Element {
   const [marginRebalance, setMarginRebalance] = useState<boolean>(true);
   const [marginRebalanceMode, setMarginRebalanceMode] = useState<SimulationInput["marginRebalanceMode"]>("gains-only");
   const [marginMaintenancePct, setMarginMaintenancePct] = useState<number>(25);
+  const [marginLiquidationBufferPct, setMarginLiquidationBufferPct] = useState<number>(10);
 
   // Custom tickers state
   const [customTickers, setCustomTickers] = useState<Record<string, CustomTicker>>({});
@@ -1268,6 +848,7 @@ function PortfolioAllocatorInner(): JSX.Element {
           if (typeof g.marginRebalance === "boolean") setMarginRebalance(g.marginRebalance);
           if (g.marginRebalanceMode) setMarginRebalanceMode(g.marginRebalanceMode);
           if (typeof g.marginMaintenancePct === "number") setMarginMaintenancePct(g.marginMaintenancePct);
+          if (typeof g.marginLiquidationBufferPct === "number") setMarginLiquidationBufferPct(g.marginLiquidationBufferPct);
         }
         // Backward compat: if margin was stored per-portfolio (old shape), hoist from first portfolio.
         if (restored[0] && (restored[0] as Portfolio & { marginEnabled?: boolean }).marginEnabled !== undefined) {
@@ -1348,6 +929,7 @@ function PortfolioAllocatorInner(): JSX.Element {
         marginRebalance,
         marginRebalanceMode,
         marginMaintenancePct,
+        marginLiquidationBufferPct,
       },
     };
     const value = JSON.stringify(data);
@@ -1374,6 +956,7 @@ function PortfolioAllocatorInner(): JSX.Element {
     marginRebalance,
     marginRebalanceMode,
     marginMaintenancePct,
+    marginLiquidationBufferPct,
   ]);
 
   // Build merged prices map (static + custom)
@@ -1405,6 +988,7 @@ function PortfolioAllocatorInner(): JSX.Element {
 
   const buildSimulationInput = useCallback(
     (p: Portfolio): SimulationInput => ({
+      comparisonPeriod: getComparisonPeriod(allPrices, portfolios.map(portfolio => portfolio.selectedTickers)),
       tickers: p.selectedTickers,
       weights: p.selectedTickers.map((t) => p.weights[t] ?? 0),
       initialInvestment,
@@ -1417,6 +1001,7 @@ function PortfolioAllocatorInner(): JSX.Element {
       marginRebalance,
       marginRebalanceMode,
       marginMaintenancePct,
+      marginLiquidationBufferPct,
       inflationPct,
       windowMode,
       yearsBack,
@@ -1424,7 +1009,7 @@ function PortfolioAllocatorInner(): JSX.Element {
       customEnd,
       contribStopYears,
     }),
-    [initialInvestment, monthlyContribution, rebalance, inflationPct, windowMode, yearsBack, customStart, customEnd, contribStopYears, marginEnabled, marginLeverage, marginLoanRatePct, marginInterestFreq, marginRebalance, marginRebalanceMode, marginMaintenancePct]
+    [allPrices, portfolios, initialInvestment, monthlyContribution, rebalance, inflationPct, windowMode, yearsBack, customStart, customEnd, contribStopYears, marginEnabled, marginLeverage, marginLoanRatePct, marginInterestFreq, marginRebalance, marginRebalanceMode, marginMaintenancePct, marginLiquidationBufferPct]
   );
 
   const deferredGlobal = useDeferredValue({
@@ -1444,40 +1029,35 @@ function PortfolioAllocatorInner(): JSX.Element {
     marginRebalance,
     marginRebalanceMode,
     marginMaintenancePct,
+    marginLiquidationBufferPct,
   });
   const deferredPortfolios = useDeferredValue(portfolios);
   const isPending = deferredPortfolios !== portfolios;
 
   const results = useMemo<Record<string, BacktestResult | null>>(() => {
-    const out: Record<string, BacktestResult | null> = {};
-    for (const p of deferredPortfolios) {
-      if (p.selectedTickers.length === 0) {
-        out[p.id] = null;
-        continue;
-      }
-      const input: SimulationInput = {
-        tickers: p.selectedTickers,
-        weights: p.selectedTickers.map((t) => p.weights[t] ?? 0),
-        initialInvestment: deferredGlobal.initialInvestment,
-        monthlyContribution: deferredGlobal.monthlyContribution,
-        rebalance: deferredGlobal.rebalance,
-        marginEnabled: deferredGlobal.marginEnabled,
-        marginLeverage: deferredGlobal.marginLeverage,
-        marginLoanRate: deferredGlobal.marginLoanRatePct / 100,
-        marginInterestFreq: deferredGlobal.marginInterestFreq,
-        marginRebalance: deferredGlobal.marginRebalance,
-        marginRebalanceMode: deferredGlobal.marginRebalanceMode,
-        marginMaintenancePct: deferredGlobal.marginMaintenancePct,
-        inflationPct: deferredGlobal.inflationPct,
-        windowMode: deferredGlobal.windowMode,
-        yearsBack: deferredGlobal.yearsBack,
-        customStart: deferredGlobal.customStart,
-        customEnd: deferredGlobal.customEnd,
-        contribStopYears: deferredGlobal.contribStopYears,
-      };
-      out[p.id] = runBacktest(input, allPrices);
-    }
-    return out;
+    const inputs: SimulationInput[] = deferredPortfolios.map(p => ({
+      tickers: p.selectedTickers,
+      weights: p.selectedTickers.map((t) => p.weights[t] ?? 0),
+      initialInvestment: deferredGlobal.initialInvestment,
+      monthlyContribution: deferredGlobal.monthlyContribution,
+      rebalance: deferredGlobal.rebalance,
+      marginEnabled: deferredGlobal.marginEnabled,
+      marginLeverage: deferredGlobal.marginLeverage,
+      marginLoanRate: deferredGlobal.marginLoanRatePct / 100,
+      marginInterestFreq: deferredGlobal.marginInterestFreq,
+      marginRebalance: deferredGlobal.marginRebalance,
+      marginRebalanceMode: deferredGlobal.marginRebalanceMode,
+      marginMaintenancePct: deferredGlobal.marginMaintenancePct,
+      marginLiquidationBufferPct: deferredGlobal.marginLiquidationBufferPct,
+      inflationPct: deferredGlobal.inflationPct,
+      windowMode: deferredGlobal.windowMode,
+      yearsBack: deferredGlobal.yearsBack,
+      customStart: deferredGlobal.customStart,
+      customEnd: deferredGlobal.customEnd,
+      contribStopYears: deferredGlobal.contribStopYears,
+    }));
+    const alignedResults = runComparison(inputs, allPrices, TICKER_NAMES);
+    return Object.fromEntries(deferredPortfolios.map((portfolio, index) => [portfolio.id, alignedResults[index]]));
   }, [deferredPortfolios, deferredGlobal, allPrices]);
 
   const updatePortfolio = useCallback((id: string, updater: (p: Portfolio) => Portfolio) => {
@@ -1750,6 +1330,7 @@ function PortfolioAllocatorInner(): JSX.Element {
   }, [customInput, allTickers, fetchCustomTicker]);
 
   const activeResult = activePortfolio ? (results[activePortfolio.id] ?? null) : null;
+  const comparisonResult = Object.values(results).find((result): result is BacktestResult => result !== null);
 
   const activePortfolioChartData = useMemo(() => {
     if (!activeResult) return [];
@@ -1761,6 +1342,8 @@ function PortfolioAllocatorInner(): JSX.Element {
       invested: activeResult.invested[i],
       investedReal: activeResult.investedReal[i],
       loan: activeResult.loanAmountSeries[i],
+      liquidation: activeResult.liquidationValueSeries[i],
+      liqDistance: activeResult.liquidationDistanceSeries[i] * 100,
     }));
   }, [activeResult]);
 
@@ -1785,9 +1368,10 @@ function PortfolioAllocatorInner(): JSX.Element {
   }, [activePortfolio, allTickers]);
 
   const activeCorrelationMatrix = useMemo(() => {
-    if (!activePortfolio || activePortfolio.selectedTickers.length < 2) return null;
+    if (!activePortfolio || !activeResult || activePortfolio.selectedTickers.length < 2) return null;
     const tickers = activePortfolio.selectedTickers;
-    const { months: allMonths, lookups } = intersectPeriod(allPrices, tickers);
+    const { lookups } = intersectPeriod(allPrices, tickers);
+    const allMonths = activeResult.months;
     if (allMonths.length < 2) return null;
     const returns: Record<string, number[]> = {};
     tickers.forEach((ticker, i) => {
@@ -1817,7 +1401,7 @@ function PortfolioAllocatorInner(): JSX.Element {
     return tickers.map((t1) =>
       tickers.map((t2) => (t1 === t2 ? 1 : corr(returns[t1] ?? [], returns[t2] ?? [])))
     );
-  }, [activePortfolio, allPrices]);
+  }, [activePortfolio, activeResult, allPrices]);
 
   const activeYearlyChartData = useMemo(() => {
     if (!activeResult) return [];
@@ -1987,6 +1571,8 @@ function PortfolioAllocatorInner(): JSX.Element {
               {p.dataKey === "invested" && `${t("alloc.chart.invested")}: ${formatEUR(p.value, lang)}`}
               {p.dataKey === "investedReal" && `${t("alloc.chart.invested")} (${t("alloc.real.suffix")}): ${formatEUR(p.value, lang)}`}
               {p.dataKey === "loan" && `${t("alloc.chart.loan")}: ${formatEUR(p.value, lang)}`}
+              {p.dataKey === "liquidation" && `${t("alloc.chart.liquidation")}: ${formatEUR(p.value, lang)}`}
+              {p.dataKey === "liqDistance" && `${t("alloc.chart.liqDistance")}: ${p.value.toFixed(1)} %`}
               {p.dataKey === "drawdown" && `${t("alloc.chart.drawdownLabel")}: ${p.value.toFixed(1)} %`}
               {p.dataKey === "allocation" && `${p.value.toFixed(1)} %`}
               {p.dataKey === "gain" && `${t("alloc.chart.gain")}: ${formatEUR(p.value, lang)}`}
@@ -2005,6 +1591,9 @@ function PortfolioAllocatorInner(): JSX.Element {
   const pfTotalWeight = (p: Portfolio) => pfWeightArray(p).reduce((s, w) => s + w, 0);
   const pfIsBalanced = (p: Portfolio) => Math.abs(pfTotalWeight(p) - 100) < 0.01;
   const loanPreview = marginEnabled ? initialInvestment * (marginLeverage - 1) : 0;
+  // Fall from the target leverage that triggers liquidation: 1 - (L - 1) / (L * (1 - maintenance)).
+  const targetLiquidationDistancePct =
+    (1 - (marginLeverage - 1) / (marginLeverage * (1 - marginMaintenancePct / 100))) * 100;
 
   const PF_COLORS = ["#34d399", "#60a5fa", "#fbbf24", "#f472b6", "#a78bfa", "#22d3ee", "#fb923c", "#4ade80"];
 
@@ -2591,9 +2180,29 @@ function PortfolioAllocatorInner(): JSX.Element {
                             >
                               <SelectItem value="gains-only">{t("alloc.col.config.margin.relevModeGains")}</SelectItem>
                               <SelectItem value="bidirectional">{t("alloc.col.config.margin.relevModeBi")}</SelectItem>
+                              <SelectItem value="near-liquidation">{t("alloc.col.config.margin.relevModeNearLiq")}</SelectItem>
                             </Select>
                           </LabelWithHelp>
                         </div>
+                        {marginRebalanceMode === "near-liquidation" && (
+                          <div className="max-w-xs mt-3">
+                            <LabelWithHelp labelKey="alloc.col.config.margin.liqBuffer" helpKey="alloc.col.config.margin.liqBuffer.help">
+                              <NumberInputField
+                                value={marginLiquidationBufferPct}
+                                onCommit={(v) => setMarginLiquidationBufferPct(v)}
+                                min={1}
+                                max={50}
+                                step={1}
+                              />
+                            </LabelWithHelp>
+                            <Text className="text-tremor-content dark:text-slate-500 text-xs mt-1">
+                              {t("alloc.col.config.margin.liqBuffer.target", {
+                                leverage: marginLeverage.toFixed(2),
+                                drop: formatPct(targetLiquidationDistancePct, 1, lang),
+                              })}
+                            </Text>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -2621,6 +2230,15 @@ function PortfolioAllocatorInner(): JSX.Element {
               </Callout>
             ) : (
               <>
+                <Text className="text-tremor-content dark:text-slate-400 text-xs mb-3">
+                  {comparisonResult
+                    ? t("alloc.compare.commonPeriod", {
+                        start: comparisonResult.startMonth,
+                        end: comparisonResult.endMonth,
+                        years: ((comparisonResult.months.length - 1) / 12).toLocaleString(lang, { maximumFractionDigits: 2 }),
+                      })
+                    : t("alloc.compare.noCommonPeriod")}
+                </Text>
                 {/* Comparison table */}
                 <div className="overflow-x-auto rounded-xl border border-slate-800 mb-6">
                   <table className="w-full text-left text-xs">
@@ -2640,6 +2258,7 @@ function PortfolioAllocatorInner(): JSX.Element {
                     <tbody>
                       {(() => {
                         const rows: Array<{ key: string; label: string; render: (r: BacktestResult | null) => React.ReactNode }> = [
+                          { key: "period", label: t("alloc.compare.period"), render: (r) => r ? `${r.startMonth} – ${r.endMonth}` : "—" },
                           { key: "finalValue", label: t("alloc.metrics.finalValue"), render: (r) => r ? formatEUR(r.finalValue, lang) : "—" },
                           { key: "totalInvested", label: t("alloc.metrics.totalInvested"), render: (r) => r ? formatEUR(r.totalInvested, lang) : "—" },
                           { key: "cagr", label: t("alloc.metrics.cagr"), render: (r) => r ? formatPct(r.cagr * 100, 2, lang) : "—" },
@@ -2653,13 +2272,16 @@ function PortfolioAllocatorInner(): JSX.Element {
                           { key: "leverage", label: t("alloc.metrics.leverage"), render: (r) => r && r.marginEnabled ? `${r.marginLeverage.toFixed(2)}×` : null },
                           { key: "loan", label: t("alloc.metrics.loan"), render: (r) => r && r.marginEnabled ? formatEUR(r.loanAmount, lang) : null },
                           { key: "interestPaid", label: t("alloc.metrics.interestPaid"), render: (r) => r && r.marginEnabled ? formatEUR(r.totalInterestPaid, lang) : null },
+                          { key: "minLiqDistance", label: t("alloc.metrics.minLiqDistance"), render: (r) => r && r.minLiquidationDistance !== null ? (r.liquidationMonth ? `${t("alloc.metrics.liquidated")} ${r.liquidationMonth}` : `${formatPct(r.minLiquidationDistance * 100, 1, lang)} (${r.minLiquidationDistanceMonth})`) : null },
+                          { key: "liqValue", label: t("alloc.metrics.liqValue"), render: (r) => r && r.marginEnabled && !r.liquidationMonth ? `${formatEUR(r.liquidationValueSeries.at(-1) ?? 0, lang)} / ${formatEUR(r.portfolioValue.at(-1) ?? 0, lang)}` : null },
+                          { key: "deleverage", label: t("alloc.metrics.deleverage"), render: (r) => r && r.marginEnabled ? `${r.deleverageCount} (${formatEUR(r.totalDeleveraged, lang)})` : null },
                         ];
                         return rows.map((row) => {
                           const values = portfolios.map((p) => row.render(results[p.id] ?? null));
                           if (values.every((v) => v === null)) return null;
                           return (
                             <tr key={row.key} className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors">
-                              <td className="px-3 py-2 font-medium text-slate-300 whitespace-nowrap sticky left-0 bg-slate-900/60">{row.label}</td>
+                              <td className="px-3 py-2 font-medium text-slate-300 whitespace-nowrap sticky left-0 bg-slate-900/60" title={row.key === "cagr" ? t("alloc.metrics.cagr.help") : undefined}>{row.label}</td>
                               {values.map((v, i) => (
                                 <td key={i} className="px-3 py-2 tabular-nums text-right text-slate-200 whitespace-nowrap">{v ?? "—"}</td>
                               ))}
@@ -2774,6 +2396,9 @@ function PortfolioAllocatorInner(): JSX.Element {
                                 {activeResult.marginEnabled && (
                                   <Area type="monotone" dataKey="loan" name={t("alloc.chart.loan")} stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.04} strokeWidth={1.5} dot={false} />
                                 )}
+                                {activeResult.marginEnabled && (
+                                  <Line type="stepAfter" dataKey="liquidation" name={t("alloc.chart.liquidation")} stroke="#fb923c" strokeWidth={1.5} dot={false} strokeDasharray="6 3" />
+                                )}
                                 <Line type="monotone" dataKey="equity" name={t("alloc.chart.equity")} stroke="#38bdf8" strokeWidth={2.5} dot={false} />
                                 {inflationPct > 0 && (
                                   <Line type="monotone" dataKey="equityReal" name={`${t("alloc.chart.equity")} (${t("alloc.real.suffix")})`} stroke="#a78bfa" strokeWidth={1.5} dot={false} strokeDasharray="5 4" />
@@ -2789,7 +2414,38 @@ function PortfolioAllocatorInner(): JSX.Element {
                               <span className="flex items-center gap-1.5"><span className="w-3 h-1 rounded-full bg-slate-500" />{t("alloc.chart.invested")}</span>
                               {inflationPct > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-1 rounded-full bg-violet-400" />{t("alloc.real.suffix")}</span>}
                               {activeResult.marginEnabled && <span className="flex items-center gap-1.5"><span className="w-3 h-1 rounded-full bg-rose-500" />{t("alloc.chart.loan")}</span>}
+                              {activeResult.marginEnabled && <span className="flex items-center gap-1.5"><span className="w-3 h-1 rounded-full bg-orange-400" />{t("alloc.chart.liquidation")}</span>}
                             </div>
+                          </div>
+                        )}
+
+                        {activeResult && activePortfolio && activeResult.marginEnabled && activePortfolioChartData.length > 0 && (
+                          <div>
+                            <Text className="text-tremor-content dark:text-slate-400 text-sm mb-1">
+                              {t("alloc.chart.liqDistanceTitle", { name: activePortfolio.name })}
+                            </Text>
+                            <Text className="text-tremor-content dark:text-slate-500 text-xs mb-2">
+                              {activeResult.liquidationMonth
+                                ? t("alloc.chart.liqDistanceLiquidated", { month: activeResult.liquidationMonth })
+                                : t("alloc.chart.liqDistanceSummary", {
+                                    min: formatPct((activeResult.minLiquidationDistance ?? 0) * 100, 1, lang),
+                                    month: activeResult.minLiquidationDistanceMonth ?? "—",
+                                    count: String(activeResult.deleverageCount),
+                                    repaid: formatEUR(activeResult.totalDeleveraged, lang),
+                                  })}
+                            </Text>
+                            <ResponsiveContainer width="100%" height={220}>
+                              <ComposedChart data={activePortfolioChartData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                <XAxis dataKey="month" tick={{ fill: "#94a3b8", fontSize: 11 }} angle={-45} textAnchor="end" height={60} interval="preserveStartEnd" />
+                                <YAxis tick={{ fill: "#94a3b8", fontSize: 12 }} tickFormatter={(v: number) => `${v.toFixed(0)} %`} width={60} domain={[0, "auto"]} />
+                                <Tooltip content={<CustomTooltip unit="pct" />} />
+                                <Area type="monotone" dataKey="liqDistance" name={t("alloc.chart.liqDistance")} stroke="#fb923c" fill="#fb923c" fillOpacity={0.08} strokeWidth={1.5} dot={false} />
+                                {marginRebalance && marginRebalanceMode === "near-liquidation" && (
+                                  <ReferenceLine y={marginLiquidationBufferPct} stroke="#f43f5e" strokeDasharray="4 3" label={{ value: t("alloc.chart.liqBufferLine"), fill: "#fda4af", fontSize: 10, position: "insideTopRight" }} />
+                                )}
+                              </ComposedChart>
+                            </ResponsiveContainer>
                           </div>
                         )}
                       </div>

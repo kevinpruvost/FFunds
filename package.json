@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "test": "node --experimental-strip-types --test scripts/*.test.mjs",
     "dev": "astro dev",
     "build": "astro build",
     "check": "NODE_OPTIONS='--max-old-space-size=4096' astro check",
